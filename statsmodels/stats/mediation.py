@@ -15,12 +15,14 @@ In the case of linear models with no interactions involving the
 mediator, the results should be similar or identical to the earlier
 Barron-Kenny approach.
 """
+
 import numpy as np
 import pandas as pd
 from statsmodels.graphics.utils import maybe_name_or_idx
+import statsmodels.compat.pandas as pdc  # pragma: no cover
 
 
-class Mediation:
+class Mediation(object):
     """
     Conduct a mediation analysis.
 
@@ -34,14 +36,14 @@ class Mediation:
         Regression model for the mediator variable.  Predictor
         variables include the treatment/exposure and any other
         variables of interest.
-    exposure : str or (int, int) tuple
+    exposure : string or (int, int) tuple
         The name or column position of the treatment/exposure
         variable.  If positions are given, the first integer is the
         column position of the exposure variable in the outcome model
         and the second integer is the position of the exposure variable
         in the mediator model.  If a string is given, it must be the name
         of the exposure variable in both regression models.
-    mediator : {str, int}
+    mediator : string or int
         The name or column position of the mediator variable in the
         outcome regression model.  If None, infer the name from the
         mediator model formula (if present).
@@ -56,9 +58,6 @@ class Mediation:
         Keyword arguments to use when fitting the outcome model.
     mediator_fit_kwargs : dict-like
         Keyword arguments to use when fitting the mediator model.
-    outcome_predict_kwargs : dict-like
-        Keyword arguments to use when calling predict on the outcome
-        model.
 
     Returns a ``MediationResults`` object.
 
@@ -123,8 +122,7 @@ class Mediation:
     """
 
     def __init__(self, outcome_model, mediator_model, exposure, mediator=None,
-                 moderators=None, outcome_fit_kwargs=None, mediator_fit_kwargs=None,
-                 outcome_predict_kwargs=None):
+                 moderators=None, outcome_fit_kwargs=None, mediator_fit_kwargs=None):
 
         self.outcome_model = outcome_model
         self.mediator_model = mediator_model
@@ -137,11 +135,9 @@ class Mediation:
             self.mediator = mediator
 
         self._outcome_fit_kwargs = (outcome_fit_kwargs if outcome_fit_kwargs
-                is not None else {})
+                                    is not None else {})
         self._mediator_fit_kwargs = (mediator_fit_kwargs if mediator_fit_kwargs
-                is not None else {})
-        self._outcome_predict_kwargs = (outcome_predict_kwargs if
-                outcome_predict_kwargs is not None else {})
+                                     is not None else {})
 
         # We will be changing these so need to copy.
         self._outcome_exog = outcome_model.exog.copy()
@@ -167,7 +163,7 @@ class Mediation:
             return maybe_name_or_idx(self.mediator, mod)[1]
 
         exp = self.exposure
-        exp_is_2 = ((len(exp) == 2) and not isinstance(exp, str))
+        exp_is_2 = ((len(exp) == 2) and (type(exp) != type('')))
 
         if exp_is_2:
             if model == 'outcome':
@@ -268,9 +264,9 @@ class Mediation:
 
         Parameters
         ----------
-        method : str
+        method : string
             Either 'parametric' or 'bootstrap'.
-        n_rep : int
+        n_rep : integer
             The number of simulation replications.
 
         Returns a MediationResults object.
@@ -308,17 +304,14 @@ class Mediation:
             predicted_outcomes = [[None, None], [None, None]]
             for tm in 0, 1:
                 mex = self._get_mediator_exog(tm)
-                kwargs = {"exog": mex}
-                if hasattr(mediator_result, "scale"):
-                    kwargs["scale"] = mediator_result.scale
                 gen = self.mediator_model.get_distribution(mediation_params,
-                                                           **kwargs)
+                                                           mediator_result.scale,
+                                                           exog=mex)
                 potential_mediator = gen.rvs(mex.shape[0])
 
                 for te in 0, 1:
                     oex = self._get_outcome_exog(te, potential_mediator)
-                    po = self.outcome_model.predict(outcome_params, oex,
-                            **self._outcome_predict_kwargs)
+                    po = self.outcome_model.predict(outcome_params, oex)
                     predicted_outcomes[tm][te] = po
 
             for t in 0, 1:
@@ -341,7 +334,7 @@ def _pvalue(vec):
     return 2 * min(sum(vec > 0), sum(vec < 0)) / float(len(vec))
 
 
-class MediationResults:
+class MediationResults(object):
     """
     A class for holding the results of a mediation analysis.
 
@@ -375,29 +368,25 @@ class MediationResults:
         self.ACME_avg = (self.ACME_ctrl + self.ACME_tx) / 2
         self.ADE_avg = (self.ADE_ctrl + self.ADE_tx) / 2
 
+
     def summary(self, alpha=0.05):
         """
         Provide a summary of a mediation analysis.
         """
 
         columns = ["Estimate", "Lower CI bound", "Upper CI bound", "P-value"]
-        index = ["ACME (control)", "ACME (treated)",
-                 "ADE (control)", "ADE (treated)",
-                 "Total effect",
-                 "Prop. mediated (control)",
-                 "Prop. mediated (treated)",
-                 "ACME (average)", "ADE (average)",
-                 "Prop. mediated (average)"]
+        index = ["ACME (control)", "ACME (treated)", "ADE (control)", "ADE (treated)",
+                 "Total effect", "Prop. mediated (control)", "Prop. mediated (treated)",
+                 "ACME (average)", "ADE (average)", "Prop. mediated (average)"]
         smry = pd.DataFrame(columns=columns, index=index)
 
-        for i, vec in enumerate([self.ACME_ctrl, self.ACME_tx,
-                                 self.ADE_ctrl, self.ADE_tx,
+        for i, vec in enumerate([self.ACME_ctrl, self.ACME_tx, self.ADE_ctrl, self.ADE_tx,
                                  self.total_effect, self.prop_med_ctrl,
-                                 self.prop_med_tx, self.ACME_avg,
-                                 self.ADE_avg, self.prop_med_avg]):
+                                 self.prop_med_tx, self.ACME_avg, self.ADE_avg,
+                                 self.prop_med_avg]):
 
             if ((vec is self.prop_med_ctrl) or (vec is self.prop_med_tx) or
-                    (vec is self.prop_med_avg)):
+                (vec is self.prop_med_avg)):
                 smry.iloc[i, 0] = np.median(vec)
             else:
                 smry.iloc[i, 0] = vec.mean()
@@ -405,6 +394,9 @@ class MediationResults:
             smry.iloc[i, 2] = np.percentile(vec, 100 * (1 - alpha / 2))
             smry.iloc[i, 3] = _pvalue(vec)
 
-        smry = smry.apply(pd.to_numeric, errors='coerce')
+        if pdc.version < '0.17.0':  # pragma: no cover
+            smry = smry.convert_objects(convert_numeric=True)
+        else:  # pragma: no cover
+            smry = smry.apply(pd.to_numeric, errors='coerce')
 
         return smry

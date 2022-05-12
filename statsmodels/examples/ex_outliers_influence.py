@@ -1,4 +1,5 @@
 
+from __future__ import print_function
 import numpy as np
 
 import statsmodels.stats.outliers_influence as oi

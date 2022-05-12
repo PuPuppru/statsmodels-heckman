@@ -1,7 +1,6 @@
-"""Mauna Loa Weekly Atmospheric CO2 Data"""
-import pandas as pd
+#! /usr/bin/env python
 
-from statsmodels.datasets import utils as du
+"""Mauna Loa Weekly Atmospheric CO2 Data"""
 
 __docformat__ = 'restructuredtext'
 
@@ -39,14 +38,11 @@ NOTE        = """::
     The data returned by load_pandas contains the dates as the index.
 """
 
+import numpy as np
+from statsmodels.datasets import utils as du
+from os.path import dirname, abspath
 
-def load_pandas():
-    data = _get_data()
-    index = pd.date_range(start=str(data['date'][0]), periods=len(data), freq='W-SAT')
-    dataset = data[['co2']]
-    dataset.index = index
-    return du.Dataset(data=dataset, names=list(data.columns))
-
+import pandas as pd
 
 def load():
     """
@@ -54,10 +50,31 @@ def load():
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
-    return load_pandas()
+    data = _get_data()
+    names = data.dtype.names
+    return du.Dataset(data=data, names=names)
+
+
+def load_pandas():
+    data = load()
+    # pandas <= 0.12.0 fails in the to_datetime regex on Python 3
+    index = pd.DatetimeIndex(start=data.data['date'][0].decode('utf-8'),
+                             periods=len(data.data), format='%Y%m%d',
+                             freq='W-SAT')
+    dataset = pd.DataFrame(data.data['co2'], index=index, columns=['co2'])
+    #NOTE: this is how I got the missing values in co2.csv
+    #new_index = pd.DatetimeIndex(start='1958-3-29', end=index[-1],
+    #                             freq='W-SAT')
+    #data.data = dataset.reindex(new_index)
+    data.data = dataset
+    return data
+
 
 def _get_data():
-    return du.load_csv(__file__, 'co2.csv')
+    filepath = dirname(abspath(__file__))
+    with open(filepath + '/co2.csv', 'rb') as f:
+        data = np.recfromtxt(f, delimiter=",", names=True, dtype=['a8', float])
+    return data

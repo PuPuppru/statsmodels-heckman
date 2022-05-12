@@ -10,6 +10,7 @@ TODO:
   - rewrite core loop to use for...except instead of while.
 
 """
+from __future__ import print_function
 import numpy as np
 from scipy import optimize
 
@@ -118,24 +119,26 @@ def brentq_expanding(func, low=None, upp=None, args=(), xtol=1e-5,
 
     # increasing or not ?
     if ((low is None) or (upp is None)) and increasing is None:
-        assert sl < su  # check during development
+        assert sl < su  # check during developement
         f_low = func(sl, *args)
         f_upp = func(su, *args)
 
         # special case for F-distribution (symmetric around zero for effect
         # size)
-        # chisquare also takes an indefinite time (did not wait see if it
+        # chisquare also takes an indefinite time (didn't wait see if it
         # returns)
         if np.max(np.abs(f_upp - f_low)) < 1e-15 and sl == -1 and su == 1:
             sl = 1e-8
             f_low = func(sl, *args)
             increasing = (f_low < f_upp)
+            if DEBUG:
+                print('symm', sl, su, f_low, f_upp)
 
         # possibly func returns nan
         delta = su - sl
         if np.isnan(f_low):
             # try just 3 points to find ``increasing``
-            # do not change sl because brentq can handle one nan bound
+            # don't change sl because brentq can handle one nan bound
             for fraction in [0.25, 0.5, 0.75]:
                 sl_ = sl + fraction * delta
                 f_low = func(sl_, *args)
@@ -159,6 +162,11 @@ def brentq_expanding(func, low=None, upp=None, args=(), xtol=1e-5,
                                  'bounds')
 
         increasing = (f_low < f_upp)
+
+    if DEBUG:
+        print('low, upp', low, upp, func(sl, *args), func(su, *args))
+        print('increasing', increasing)
+        print('sl, su', sl, su)
 
     if not increasing:
         sl, su = su, sl

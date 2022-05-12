@@ -1,4 +1,4 @@
-'''run all examples to make sure we do not get an exception
+'''run all examples to make sure we don't get an exception
 
 Note:
 If an example contaings plt.show(), then all plot windows have to be closed
@@ -23,8 +23,7 @@ if 'y' in cont.lower():
         try:
             print("Executing example file", run_all_f)
             print("-----------------------" + "-"*len(run_all_f))
-            with open(run_all_f, encoding="utf-8") as f:
-                exec(f.read())
+            exec(open(run_all_f).read())
         except:
             #f might be overwritten in the executed file
             print("*********************")
@@ -34,4 +33,4 @@ if 'y' in cont.lower():
                 raise
 #plt.show()
 #plt.close('all')
-#close does not work because I never get here without closing plots manually
+#close doesn't work because I never get here without closing plots manually

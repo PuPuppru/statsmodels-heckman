@@ -7,27 +7,31 @@ observations (2) is smaller than the number of states (6).
 Author: Chad Fulton
 License: Simplified-BSD
 """
+from __future__ import division, absolute_import, print_function
 
 import numpy as np
 import pandas as pd
-import pytest
 import os
 
 from statsmodels import datasets
-from statsmodels.tsa.statespace import dynamic_factor
 from statsmodels.tsa.statespace.mlemodel import MLEModel
 from statsmodels.tsa.statespace.kalman_filter import (
-    FILTER_UNIVARIATE)
+    FILTER_CONVENTIONAL, FILTER_COLLAPSED, FILTER_UNIVARIATE)
 from statsmodels.tsa.statespace.kalman_smoother import (
-    SMOOTH_CLASSICAL, SMOOTH_ALTERNATIVE,
+    SMOOTH_CONVENTIONAL, SMOOTH_CLASSICAL, SMOOTH_ALTERNATIVE,
     SMOOTH_UNIVARIATE)
+from statsmodels.tsa.statespace.tools import compatibility_mode
 from statsmodels.tsa.statespace.tests.results import results_kalman_filter
 from numpy.testing import assert_equal, assert_allclose
+from nose.exc import SkipTest
 
 current_path = os.path.dirname(os.path.abspath(__file__))
 
+if compatibility_mode:
+    raise SkipTest('Collapsed methods not available.')
 
-class Trivariate:
+
+class Trivariate(object):
     """
     Tests collapsing three-dimensional observation data to two-dimensional
     """
@@ -56,10 +60,10 @@ class Trivariate:
 
         # Update matrices with test parameters
         cls.model['design'] = np.array([[0.5, 0.2],
-                                        [0,   0.8],
-                                        [1,  -0.5]])
+                                         [0,   0.8],
+                                         [1,  -0.5]])
         cls.model['transition'] = np.array([[0.4, 0.5],
-                                            [1,   0]])
+                                             [1,   0]])
         cls.model['obs_cov'] = np.diag([0.2, 1.1, 0.5])
         cls.model['state_cov'] = np.diag([2., 1])
 
@@ -82,20 +86,20 @@ class Trivariate:
 
     def test_forecasts(self):
         assert_allclose(
-            self.results_a.forecasts[0, :],
-            self.results_b.forecasts[0, :],
+            self.results_a.forecasts[0,:],
+            self.results_b.forecasts[0,:],
         )
 
     def test_forecasts_error(self):
         assert_allclose(
-            self.results_a.forecasts_error[0, :],
-            self.results_b.forecasts_error[0, :]
+            self.results_a.forecasts_error[0,:],
+            self.results_b.forecasts_error[0,:]
         )
 
     def test_forecasts_error_cov(self):
         assert_allclose(
-            self.results_a.forecasts_error_cov[0, 0, :],
-            self.results_b.forecasts_error_cov[0, 0, :]
+            self.results_a.forecasts_error_cov[0,0,:],
+            self.results_b.forecasts_error_cov[0,0,:]
         )
 
     def test_filtered_state(self):
@@ -147,18 +151,18 @@ class Trivariate:
             self.results_b.smoothed_state_autocov
         )
 
+    @SkipTest
     # Skipped because "measurement" refers to different things; even different
     # dimensions
-    @pytest.mark.skip
     def test_smoothed_measurement_disturbance(self):
         assert_allclose(
             self.results_a.smoothed_measurement_disturbance,
             self.results_b.smoothed_measurement_disturbance
         )
 
+    @SkipTest
     # Skipped because "measurement" refers to different things; even different
     # dimensions
-    @pytest.mark.skip
     def test_smoothed_measurement_disturbance_cov(self):
         assert_allclose(
             self.results_a.smoothed_measurement_disturbance_cov,
@@ -195,7 +199,6 @@ class Trivariate:
             self.sim_a.simulated_state_disturbance
         )
 
-
 class TestTrivariateConventional(Trivariate):
 
     @classmethod
@@ -222,12 +225,10 @@ class TestTrivariateConventional(Trivariate):
             initial_state_variates=np.zeros(cls.model.k_states)
         )
 
-
 class TestTrivariateConventionalAlternate(TestTrivariateConventional):
     @classmethod
     def setup_class(cls, *args, **kwargs):
-        super(TestTrivariateConventionalAlternate, cls).setup_class(
-            alternate_timing=True, *args, **kwargs)
+        super(TestTrivariateConventionalAlternate, cls).setup_class(alternate_timing=True, *args, **kwargs)
 
     def test_using_alterate(self):
         assert(self.model._kalman_filter.filter_timing == 1)
@@ -236,8 +237,7 @@ class TestTrivariateConventionalAlternate(TestTrivariateConventional):
 class TestTrivariateConventionalPartialMissing(Trivariate):
     @classmethod
     def setup_class(cls, dtype=float, **kwargs):
-        super(TestTrivariateConventionalPartialMissing, cls).setup_class(
-            dtype, **kwargs)
+        super(TestTrivariateConventionalPartialMissing, cls).setup_class(dtype, **kwargs)
         n_disturbance_variates = (
             (cls.model.k_endog + cls.model.k_posdef) * cls.model.nobs
         )
@@ -263,12 +263,10 @@ class TestTrivariateConventionalPartialMissing(Trivariate):
         )
 
 
-class TestTrivariateConventionalPartialMissingAlternate(
-        TestTrivariateConventionalPartialMissing):
+class TestTrivariateConventionalPartialMissingAlternate(TestTrivariateConventionalPartialMissing):
     @classmethod
     def setup_class(cls, *args, **kwargs):
-        super(TestTrivariateConventionalPartialMissingAlternate,
-              cls).setup_class(alternate_timing=True, *args, **kwargs)
+        super(TestTrivariateConventionalPartialMissingAlternate, cls).setup_class(alternate_timing=True, *args, **kwargs)
 
     def test_using_alterate(self):
         assert(self.model._kalman_filter.filter_timing == 1)
@@ -277,8 +275,7 @@ class TestTrivariateConventionalPartialMissingAlternate(
 class TestTrivariateConventionalAllMissing(Trivariate):
     @classmethod
     def setup_class(cls, dtype=float, **kwargs):
-        super(TestTrivariateConventionalAllMissing, cls).setup_class(
-            dtype, **kwargs)
+        super(TestTrivariateConventionalAllMissing, cls).setup_class(dtype, **kwargs)
         n_disturbance_variates = (
             (cls.model.k_endog + cls.model.k_posdef) * cls.model.nobs
         )
@@ -304,12 +301,10 @@ class TestTrivariateConventionalAllMissing(Trivariate):
         )
 
 
-class TestTrivariateConventionalAllMissingAlternate(
-        TestTrivariateConventionalAllMissing):
+class TestTrivariateConventionalAllMissingAlternate(TestTrivariateConventionalAllMissing):
     @classmethod
     def setup_class(cls, *args, **kwargs):
-        super(TestTrivariateConventionalAllMissingAlternate, cls).setup_class(
-            alternate_timing=True, *args, **kwargs)
+        super(TestTrivariateConventionalAllMissingAlternate, cls).setup_class(alternate_timing=True, *args, **kwargs)
 
     def test_using_alterate(self):
         assert(self.model._kalman_filter.filter_timing == 1)
@@ -344,8 +339,7 @@ class TestTrivariateUnivariate(Trivariate):
 class TestTrivariateUnivariateAlternate(TestTrivariateUnivariate):
     @classmethod
     def setup_class(cls, *args, **kwargs):
-        super(TestTrivariateUnivariateAlternate, cls).setup_class(
-            alternate_timing=True, *args, **kwargs)
+        super(TestTrivariateUnivariateAlternate, cls).setup_class(alternate_timing=True, *args, **kwargs)
 
     def test_using_alterate(self):
         assert(self.model._kalman_filter.filter_timing == 1)
@@ -354,8 +348,7 @@ class TestTrivariateUnivariateAlternate(TestTrivariateUnivariate):
 class TestTrivariateUnivariatePartialMissing(Trivariate):
     @classmethod
     def setup_class(cls, dtype=float, **kwargs):
-        super(TestTrivariateUnivariatePartialMissing, cls).setup_class(
-            dtype, **kwargs)
+        super(TestTrivariateUnivariatePartialMissing, cls).setup_class(dtype, **kwargs)
         n_disturbance_variates = (
             (cls.model.k_endog + cls.model.k_posdef) * cls.model.nobs
         )
@@ -381,12 +374,10 @@ class TestTrivariateUnivariatePartialMissing(Trivariate):
         )
 
 
-class TestTrivariateUnivariatePartialMissingAlternate(
-        TestTrivariateUnivariatePartialMissing):
+class TestTrivariateUnivariatePartialMissingAlternate(TestTrivariateUnivariatePartialMissing):
     @classmethod
     def setup_class(cls, *args, **kwargs):
-        super(TestTrivariateUnivariatePartialMissingAlternate,
-              cls).setup_class(alternate_timing=True, *args, **kwargs)
+        super(TestTrivariateUnivariatePartialMissingAlternate, cls).setup_class(alternate_timing=True, *args, **kwargs)
 
     def test_using_alterate(self):
         assert(self.model._kalman_filter.filter_timing == 1)
@@ -395,8 +386,7 @@ class TestTrivariateUnivariatePartialMissingAlternate(
 class TestTrivariateUnivariateAllMissing(Trivariate):
     @classmethod
     def setup_class(cls, dtype=float, **kwargs):
-        super(TestTrivariateUnivariateAllMissing, cls).setup_class(
-            dtype, **kwargs)
+        super(TestTrivariateUnivariateAllMissing, cls).setup_class(dtype, **kwargs)
         n_disturbance_variates = (
             (cls.model.k_endog + cls.model.k_posdef) * cls.model.nobs
         )
@@ -421,21 +411,39 @@ class TestTrivariateUnivariateAllMissing(Trivariate):
             initial_state_variates=np.zeros(cls.model.k_states)
         )
 
-
-class TestTrivariateUnivariateAllMissingAlternate(
-        TestTrivariateUnivariateAllMissing):
+class TestTrivariateUnivariateAllMissingAlternate(TestTrivariateUnivariateAllMissing):
     @classmethod
     def setup_class(cls, *args, **kwargs):
-        super(TestTrivariateUnivariateAllMissingAlternate, cls).setup_class(
-            alternate_timing=True, *args, **kwargs)
+        super(TestTrivariateUnivariateAllMissingAlternate, cls).setup_class(alternate_timing=True, *args, **kwargs)
 
     def test_using_alterate(self):
         assert(self.model._kalman_filter.filter_timing == 1)
 
 
-class TestDFM:
+class TestDFM(object):
     @classmethod
-    def create_model(cls, obs, **kwargs):
+    def setup_class(cls, which='mixed', *args, **kwargs):
+        if compatibility_mode:
+            raise SkipTest
+
+        # Data
+        dta = datasets.macrodata.load_pandas().data
+        dta.index = pd.date_range(start='1959-01-01', end='2009-7-01', freq='QS')
+        obs = np.log(dta[['realgdp','realcons','realinv']]).diff().ix[1:] * 400
+
+        if which == 'all':
+            obs.ix[:50, :] = np.nan
+            obs.ix[119:130, :] = np.nan
+        elif which == 'partial':
+            obs.ix[0:50, 0] = np.nan
+            obs.ix[119:130, 0] = np.nan
+        elif which == 'mixed':
+            obs.ix[0:50, 0] = np.nan
+            obs.ix[19:70, 1] = np.nan
+            obs.ix[39:90, 2] = np.nan
+            obs.ix[119:130, 0] = np.nan
+            obs.ix[119:130, 2] = np.nan
+
         # Create the model with typical state space
         mod = MLEModel(obs, k_states=2, k_posdef=2, **kwargs)
         mod['design'] = np.array([[-32.47143586, 17.33779024],
@@ -449,63 +457,27 @@ class TestDFM:
         mod['state_cov'] = np.array([[1.2, -0.25],
                                      [-0.25, 1.1]])
         mod.initialize_approximate_diffuse(1e6)
-        return mod
-
-    @classmethod
-    def collapse(cls, obs, **kwargs):
-        mod = cls.create_model(obs, **kwargs)
-        mod.smooth([], return_ssm=True)
-
-        _ss = mod.ssm._statespace
-        out = np.zeros((mod.nobs, mod.k_states))
-        for t in range(mod.nobs):
-            _ss.seek(t, mod.ssm.filter_univariate, 1)
-            out[t] = np.array(_ss.collapse_obs)
-        return out
-
-    @classmethod
-    def setup_class(cls, which='mixed', *args, **kwargs):
-        # Data
-        dta = datasets.macrodata.load_pandas().data
-        dta.index = pd.date_range(start='1959-01-01',
-                                  end='2009-7-01', freq='QS')
-        levels = dta[['realgdp', 'realcons', 'realinv']]
-        obs = np.log(levels).diff().iloc[1:] * 400
-
-        if which == 'all':
-            obs.iloc[:50, :] = np.nan
-            obs.iloc[119:130, :] = np.nan
-        elif which == 'partial':
-            obs.iloc[0:50, 0] = np.nan
-            obs.iloc[119:130, 0] = np.nan
-        elif which == 'mixed':
-            obs.iloc[0:50, 0] = np.nan
-            obs.iloc[19:70, 1] = np.nan
-            obs.iloc[39:90, 2] = np.nan
-            obs.iloc[119:130, 0] = np.nan
-            obs.iloc[119:130, 2] = np.nan
-
-        mod = cls.create_model(obs, **kwargs)
         cls.model = mod.ssm
 
         n_disturbance_variates = (
             (cls.model.k_endog + cls.model.k_posdef) * cls.model.nobs
         )
-        np.random.seed(1234)
-        dv = np.random.normal(size=n_disturbance_variates)
-        isv = np.random.normal(size=cls.model.k_states)
 
         # Collapsed filtering, smoothing, and simulation smoothing
         cls.model.filter_collapsed = True
         cls.results_b = cls.model.smooth()
-        cls.sim_b = cls.model.simulation_smoother()
-        cls.sim_b.simulate(disturbance_variates=dv, initial_state_variates=isv)
+        cls.sim_b = cls.model.simulation_smoother(
+            disturbance_variates=np.zeros(n_disturbance_variates),
+            initial_state_variates=np.zeros(cls.model.k_states)
+        )
 
         # Conventional filtering, smoothing, and simulation smoothing
         cls.model.filter_collapsed = False
         cls.results_a = cls.model.smooth()
-        cls.sim_a = cls.model.simulation_smoother()
-        cls.sim_a.simulate(disturbance_variates=dv, initial_state_variates=isv)
+        cls.sim_a = cls.model.simulation_smoother(
+            disturbance_variates=np.zeros(n_disturbance_variates),
+            initial_state_variates=np.zeros(cls.model.k_states)
+        )
 
         # Create the model with augmented state space
         kwargs.pop('filter_collapsed', None)
@@ -542,20 +514,20 @@ class TestDFM:
 
     def test_forecasts(self):
         assert_allclose(
-            self.results_a.forecasts[0, :],
-            self.results_b.forecasts[0, :],
+            self.results_a.forecasts[0,:],
+            self.results_b.forecasts[0,:],
         )
 
     def test_forecasts_error(self):
         assert_allclose(
-            self.results_a.forecasts_error[0, :],
-            self.results_b.forecasts_error[0, :]
+            self.results_a.forecasts_error[0,:],
+            self.results_b.forecasts_error[0,:]
         )
 
     def test_forecasts_error_cov(self):
         assert_allclose(
-            self.results_a.forecasts_error_cov[0, 0, :],
-            self.results_b.forecasts_error_cov[0, 0, :]
+            self.results_a.forecasts_error_cov[0,0,:],
+            self.results_b.forecasts_error_cov[0,0,:]
         )
 
     def test_filtered_state(self):
@@ -619,18 +591,18 @@ class TestDFM:
                         self.augmented_results.smoothed_state_cov[:2, 2:, 6:],
                         atol=1e-7)
 
+    @SkipTest
     # Skipped because "measurement" refers to different things; even different
     # dimensions
-    @pytest.mark.skip
     def test_smoothed_measurement_disturbance(self):
         assert_allclose(
             self.results_a.smoothed_measurement_disturbance,
             self.results_b.smoothed_measurement_disturbance
         )
 
+    @SkipTest
     # Skipped because "measurement" refers to different things; even different
     # dimensions
-    @pytest.mark.skip
     def test_smoothed_measurement_disturbance_cov(self):
         assert_allclose(
             self.results_a.smoothed_measurement_disturbance_cov,
@@ -652,22 +624,19 @@ class TestDFM:
     def test_simulation_smoothed_state(self):
         assert_allclose(
             self.sim_a.simulated_state,
-            self.sim_b.simulated_state
+            self.sim_a.simulated_state
         )
 
-    # Skipped because "measurement" refers to different things; even different
-    # dimensions
-    @pytest.mark.skip
     def test_simulation_smoothed_measurement_disturbance(self):
         assert_allclose(
             self.sim_a.simulated_measurement_disturbance,
-            self.sim_b.simulated_measurement_disturbance
+            self.sim_a.simulated_measurement_disturbance
         )
 
     def test_simulation_smoothed_state_disturbance(self):
         assert_allclose(
             self.sim_a.simulated_state_disturbance,
-            self.sim_b.simulated_state_disturbance
+            self.sim_a.simulated_state_disturbance
         )
 
 
@@ -712,43 +681,15 @@ class TestDFMAlternativeSmoothing(TestDFM):
                      SMOOTH_ALTERNATIVE)
 
 
-class TestDFMMeasurementDisturbance(TestDFM):
+class TestDFMClassicalSmoothing(TestDFM):
     @classmethod
     def setup_class(cls, *args, **kwargs):
-        super(TestDFMMeasurementDisturbance, cls).setup_class(
-            smooth_method=SMOOTH_CLASSICAL, which='none', **kwargs)
+        super(TestDFMClassicalSmoothing, cls).setup_class(
+            smooth_method=SMOOTH_CLASSICAL, **kwargs)
 
-    def test_smoothed_state_disturbance(self):
-        assert_allclose(
-            self.results_a.smoothed_state_disturbance,
-            self.results_b.smoothed_state_disturbance, atol=1e-7)
-
-    def test_smoothed_measurement_disturbance(self):
-        assert_allclose(
-            self.collapse(self.results_a.smoothed_measurement_disturbance.T).T,
-            self.results_b.smoothed_measurement_disturbance, atol=1e-7)
-
-    def test_simulation_smoothed_measurement_disturbance(self):
-        assert_allclose(
-            self.collapse(self.sim_a.simulated_measurement_disturbance.T),
-            self.sim_b.simulated_measurement_disturbance.T, atol=1e-7)
-
-    def test_simulation_smoothed_state_disturbance(self):
-        assert_allclose(
-            self.sim_a.simulated_state_disturbance,
-            self.sim_b.simulated_state_disturbance, atol=1e-7)
-
-
-def test_dfm_missing(reset_randomstate):
-    # This test is not captured by the TestTrivariate and TestDFM tests above
-    # because it has k_states = 1
-    endog = np.random.normal(size=(100, 3))
-    endog[0, :1] = np.nan
-
-    mod = dynamic_factor.DynamicFactor(endog, k_factors=1, factor_order=1)
-    mod.ssm.filter_collapsed = True
-    res = mod.smooth(mod.start_params)
-    mod.ssm.filter_collapsed = False
-    res2 = mod.smooth(mod.start_params)
-
-    assert_allclose(res.llf, res2.llf)
+    def test_smooth_method(self):
+        assert_equal(self.model.smooth_method, SMOOTH_CLASSICAL)
+        assert_equal(self.model._kalman_smoother.smooth_method,
+                     SMOOTH_CLASSICAL)
+        assert_equal(self.model._kalman_smoother._smooth_method,
+                     SMOOTH_CLASSICAL)

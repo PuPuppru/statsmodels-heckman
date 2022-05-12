@@ -1,27 +1,26 @@
 # -*- coding: utf-8 -*-
-from statsmodels.compat.python import lzip
-
+from __future__ import print_function
+from statsmodels.compat.python import lzip, zip
 import numpy as np
-
-from statsmodels.tools.validation import array_like
 from . import kernels
 
 
 #TODO: should this be a function?
-class KDE:
+class KDE(object):
     """
     Kernel Density Estimator
 
     Parameters
     ----------
-    x : array_like
+    x : array-like
         N-dimensional array from which the density is to be estimated
     kernel : Kernel Class
         Should be a class from *
+
     """
     #TODO: amend docs for Nd case?
     def __init__(self, x, kernel=None):
-        x = array_like(x, "x", maxdim=2, contiguous=True)
+        x = np.asarray(x)
         if x.ndim == 1:
             x = x[:,None]
 

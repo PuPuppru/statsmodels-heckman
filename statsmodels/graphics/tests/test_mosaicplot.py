@@ -1,42 +1,44 @@
-from statsmodels.compat.python import lrange
+from __future__ import division
+from statsmodels.compat.python import iterkeys, zip, lrange, iteritems, range
 
-from io import BytesIO
-from itertools import product
-
-import numpy as np
-from numpy.testing import assert_, assert_raises
-import pandas as pd
-import pytest
-
-from statsmodels.api import datasets
+from numpy.testing import assert_, assert_raises, dec
+from numpy.testing import run_module_suite
 
 # utilities for the tests
 
+from statsmodels.compat.pandas import sort_values
+from statsmodels.compat.collections import OrderedDict
+from statsmodels.api import datasets
+
+import numpy as np
+from itertools import product
 try:
-    import matplotlib.pyplot as plt  # noqa:F401
-except ImportError:
-    pass
+    import matplotlib.pyplot as pylab
+    have_matplotlib = True
+except:
+    have_matplotlib = False
 
-# other functions to be tested for accuracy
+from statsmodels.compat.pandas import version as pandas_version
+pandas_old = pandas_version < '0.9'
+
 # the main drawing function
-from statsmodels.graphics.mosaicplot import (
-    _hierarchical_split,
-    _key_splitting,
-    _normalize_split,
-    _reduce_dict,
-    _split_rect,
-    mosaic,
-)
+from statsmodels.graphics.mosaicplot import mosaic
+# other functions to be tested for accuracy
+from statsmodels.graphics.mosaicplot import _hierarchical_split
+from statsmodels.graphics.mosaicplot import _reduce_dict
+from statsmodels.graphics.mosaicplot import _key_splitting
+from statsmodels.graphics.mosaicplot import _normalize_split
+from statsmodels.graphics.mosaicplot import _split_rect
 
 
-@pytest.mark.matplotlib
-def test_data_conversion(close_figures):
+@dec.skipif(not have_matplotlib or pandas_old)
+def test_data_conversion():
     # It will not reorder the elements
     # so the dictionary will look odd
     # as it key order has the c and b
     # keys swapped
     import pandas
-    _, ax = plt.subplots(4, 4)
+    fig, ax = pylab.subplots(4, 4)
     data = {'ax': 1, 'bx': 2, 'cx': 3}
     mosaic(data, ax=ax[0, 0], title='basic dict', axes_label=False)
     data = pandas.Series(data)
@@ -45,7 +47,6 @@ def test_data_conversion(close_figures):
     mosaic(data, ax=ax[0, 2], title='basic list', axes_label=False)
     data = np.asarray(data)
     mosaic(data, ax=ax[0, 3], title='basic array', axes_label=False)
-    plt.close("all")
 
     data = {('ax', 'cx'): 1, ('bx', 'cx'): 2, ('ax', 'dx'): 3, ('bx', 'dx'): 4}
     mosaic(data, ax=ax[1, 0], title='compound dict', axes_label=False)
@@ -59,7 +60,6 @@ def test_data_conversion(close_figures):
     data = np.array([[1, 2], [3, 4]])
     mosaic(data, ax=ax[1, 3], title='compound array', axes_label=False)
     mosaic(data, ax=ax[2, 3], title='inverted keys array', index=[1, 0], axes_label=False)
-    plt.close("all")
 
     gender = ['male', 'male', 'male', 'female', 'female', 'female']
     pet = ['cat', 'dog', 'dog', 'cat', 'dog', 'cat']
@@ -68,12 +68,13 @@ def test_data_conversion(close_figures):
     mosaic(data, ['pet'], ax=ax[3, 1], title='dataframe by key 2', axes_label=False)
     mosaic(data, ['gender', 'pet'], ax=ax[3, 2], title='both keys', axes_label=False)
     mosaic(data, ['pet', 'gender'], ax=ax[3, 3], title='keys inverted', axes_label=False)
-    plt.close("all")
-    plt.suptitle('testing data conversion (plot 1 of 4)')
 
+    pylab.suptitle('testing data conversion (plot 1 of 4)')
+    #pylab.show()
+    pylab.close('all')
 
-@pytest.mark.matplotlib
-def test_mosaic_simple(close_figures):
+@dec.skipif(not have_matplotlib)
+def test_mosaic_simple():
     # display a simple plot of 4 categories of data, splitted in four
     # levels with increasing size for each group
     # creation of the levels
@@ -82,7 +83,7 @@ def test_mosaic_simple(close_figures):
     # the cartesian product of all the categories is
     # the complete set of categories
     keys = list(product(*key_set))
-    data = dict(zip(keys, range(1, 1 + len(keys))))
+    data = OrderedDict(zip(keys, range(1, 1 + len(keys))))
     # which colours should I use for the various categories?
     # put it into a dict
     props = {}
@@ -98,11 +99,13 @@ def test_mosaic_simple(close_figures):
                 props[key] = {'color': 'Crimson' , 'hatch': '+'}
     # mosaic of the data, with given gaps and colors
     mosaic(data, gap=0.05, properties=props, axes_label=False)
-    plt.suptitle('syntetic data, 4 categories (plot 2 of 4)')
+    pylab.suptitle('syntetic data, 4 categories (plot 2 of 4)')
+    #pylab.show()
+    pylab.close('all')
 
 
-@pytest.mark.matplotlib
-def test_mosaic(close_figures):
+@dec.skipif(not have_matplotlib or pandas_old)
+def test_mosaic():
     # make the same analysis on a known dataset
 
     # load the data and clean it a bit
@@ -113,46 +116,47 @@ def test_mosaic(close_figures):
     # sort by the marriage quality and give meaningful name
     # [rate_marriage, age, yrs_married, children,
     # religious, educ, occupation, occupation_husb]
-    datas = datas.sort_values(['rate_marriage', 'religious'])
+    datas = sort_values(datas, ['rate_marriage', 'religious'])
 
     num_to_desc = {1: 'awful', 2: 'bad', 3: 'intermediate',
-                   4: 'good', 5: 'wonderful'}
+                      4: 'good', 5: 'wonderful'}
     datas['rate_marriage'] = datas['rate_marriage'].map(num_to_desc)
     num_to_faith = {1: 'non religious', 2: 'poorly religious', 3: 'religious',
-                    4: 'very religious'}
+                      4: 'very religious'}
     datas['religious'] = datas['religious'].map(num_to_faith)
     num_to_cheat = {False: 'faithful', True: 'cheated'}
     datas['cheated'] = datas['cheated'].map(num_to_cheat)
     # finished cleaning
-    _, ax = plt.subplots(2, 2)
+    fig, ax = pylab.subplots(2, 2)
     mosaic(datas, ['rate_marriage', 'cheated'], ax=ax[0, 0],
-           title='by marriage happiness')
+                title='by marriage happiness')
     mosaic(datas, ['religious', 'cheated'], ax=ax[0, 1],
-           title='by religiosity')
+                title='by religiosity')
     mosaic(datas, ['rate_marriage', 'religious', 'cheated'], ax=ax[1, 0],
-           title='by both', labelizer=lambda k:'')
+                title='by both', labelizer=lambda k:'')
     ax[1, 0].set_xlabel('marriage rating')
     ax[1, 0].set_ylabel('religion status')
     mosaic(datas, ['religious', 'rate_marriage'], ax=ax[1, 1],
-           title='inter-dependence', axes_label=False)
-    plt.suptitle("extramarital affairs (plot 3 of 4)")
+                title='inter-dependence', axes_label=False)
+    pylab.suptitle("extramarital affairs (plot 3 of 4)")
+    #pylab.show()
+    pylab.close('all')
 
-
-@pytest.mark.matplotlib
-def test_mosaic_very_complex(close_figures):
+@dec.skipif(not have_matplotlib)
+def test_mosaic_very_complex():
     # make a scattermatrix of mosaic plots to show the correlations between
     # each pair of variable in a dataset. Could be easily converted into a
     # new function that does this automatically based on the type of data
     key_name = ['gender', 'age', 'health', 'work']
     key_base = (['male', 'female'], ['old', 'young'],
-                ['healty', 'ill'], ['work', 'unemployed'])
+                    ['healty', 'ill'], ['work', 'unemployed'])
     keys = list(product(*key_base))
-    data = dict(zip(keys, range(1, 1 + len(keys))))
+    data = OrderedDict(zip(keys, range(1, 1 + len(keys))))
     props = {}
     props[('male', 'old')] = {'color': 'r'}
     props[('female',)] = {'color': 'pink'}
     L = len(key_base)
-    _, axes = plt.subplots(L, L)
+    fig, axes = pylab.subplots(L, L)
     for i in range(L):
         for j in range(L):
             m = set(range(L)).difference(set((i, j)))
@@ -166,41 +170,42 @@ def test_mosaic_very_complex(close_figures):
             else:
                 ji = max(i, j)
                 ij = min(i, j)
-                temp_data = dict([((k[ij], k[ji]) + tuple(k[r] for r in m), v)
-                                  for k, v in data.items()])
+                temp_data = OrderedDict([((k[ij], k[ji]) + tuple(k[r] for r in m), v)
+                                            for k, v in iteritems(data)])
 
-                keys = list(temp_data.keys())
+                keys = list(iterkeys(temp_data))
                 for k in keys:
                     value = _reduce_dict(temp_data, k[:2])
                     temp_data[k[:2]] = value
                     del temp_data[k]
                 mosaic(temp_data, ax=axes[i, j], axes_label=False,
                        properties=props, gap=0.05, horizontal=i > j)
-    plt.suptitle('old males should look bright red,  (plot 4 of 4)')
+    pylab.suptitle('old males should look bright red,  (plot 4 of 4)')
+    #pylab.show()
+    pylab.close('all')
 
-
-@pytest.mark.matplotlib
-def test_axes_labeling(close_figures):
+@dec.skipif(not have_matplotlib)
+def test_axes_labeling():
     from numpy.random import rand
     key_set = (['male', 'female'], ['old', 'adult', 'young'],
                ['worker', 'unemployed'], ['yes', 'no'])
     # the cartesian product of all the categories is
     # the complete set of categories
     keys = list(product(*key_set))
-    data = dict(zip(keys, rand(len(keys))))
+    data = OrderedDict(zip(keys, rand(len(keys))))
     lab = lambda k: ''.join(s[0] for s in k)
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+    fig, (ax1, ax2) = pylab.subplots(1, 2, figsize=(16, 8))
     mosaic(data, ax=ax1, labelizer=lab, horizontal=True, label_rotation=45)
     mosaic(data, ax=ax2, labelizer=lab, horizontal=False,
-           label_rotation=[0, 45, 90, 0])
+        label_rotation=[0, 45, 90, 0])
     #fig.tight_layout()
     fig.suptitle("correct alignment of the axes labels")
+    #pylab.show()
+    pylab.close('all')
 
-
-@pytest.mark.smoke
-@pytest.mark.matplotlib
-def test_mosaic_empty_cells(close_figures):
-    # GH#2286
+@dec.skipif(not have_matplotlib or pandas_old)
+def test_mosaic_empty_cells():
+    # SMOKE test  see #2286
     import pandas as pd
     mydata = pd.DataFrame({'id2': {64: 'Angelica',
                                    65: 'DXW_UID', 66: 'casuid01',
@@ -216,8 +221,10 @@ def test_mosaic_empty_cells(close_figures):
                                    62: 'default', 63: 'default'}})
 
     ct = pd.crosstab(mydata.id1, mydata.id2)
-    _, vals = mosaic(ct.T.unstack())
-    _, vals = mosaic(mydata, ['id1','id2'])
+    fig, vals = mosaic(ct.T.unstack())
+    pylab.close('all')
+    fig, vals = mosaic(mydata, ['id1','id2'])
+    pylab.close('all')
 
 
 eq = lambda x, y: assert_(np.allclose(x, y))
@@ -225,15 +232,15 @@ eq = lambda x, y: assert_(np.allclose(x, y))
 
 def test_recursive_split():
     keys = list(product('mf'))
-    data = dict(zip(keys, [1] * len(keys)))
+    data = OrderedDict(zip(keys, [1] * len(keys)))
     res = _hierarchical_split(data, gap=0)
-    assert_(list(res.keys()) == keys)
+    assert_(list(iterkeys(res)) == keys)
     res[('m',)] = (0.0, 0.0, 0.5, 1.0)
     res[('f',)] = (0.5, 0.0, 0.5, 1.0)
     keys = list(product('mf', 'yao'))
-    data = dict(zip(keys, [1] * len(keys)))
+    data = OrderedDict(zip(keys, [1] * len(keys)))
     res = _hierarchical_split(data, gap=0)
-    assert_(list(res.keys()) == keys)
+    assert_(list(iterkeys(res)) == keys)
     res[('m', 'y')] = (0.0, 0.0, 0.5, 1 / 3)
     res[('m', 'a')] = (0.0, 1 / 3, 0.5, 1 / 3)
     res[('m', 'o')] = (0.0, 2 / 3, 0.5, 1 / 3)
@@ -243,11 +250,11 @@ def test_recursive_split():
 
 
 def test__reduce_dict():
-    data = dict(zip(list(product('mf', 'oy', 'wn')), [1] * 8))
+    data = OrderedDict(zip(list(product('mf', 'oy', 'wn')), [1] * 8))
     eq(_reduce_dict(data, ('m',)), 4)
     eq(_reduce_dict(data, ('m', 'o')), 2)
     eq(_reduce_dict(data, ('m', 'o', 'w')), 1)
-    data = dict(zip(list(product('mf', 'oy', 'wn')), lrange(8)))
+    data = OrderedDict(zip(list(product('mf', 'oy', 'wn')), lrange(8)))
     eq(_reduce_dict(data, ('m',)), 6)
     eq(_reduce_dict(data, ('m', 'o')), 1)
     eq(_reduce_dict(data, ('m', 'o', 'w')), 0)
@@ -257,19 +264,19 @@ def test__key_splitting():
     # subdivide starting with an empty tuple
     base_rect = {tuple(): (0, 0, 1, 1)}
     res = _key_splitting(base_rect, ['a', 'b'], [1, 1], tuple(), True, 0)
-    assert_(list(res.keys()) == [('a',), ('b',)])
+    assert_(list(iterkeys(res)) == [('a',), ('b',)])
     eq(res[('a',)], (0, 0, 0.5, 1))
     eq(res[('b',)], (0.5, 0, 0.5, 1))
     # subdivide a in two sublevel
     res_bis = _key_splitting(res, ['c', 'd'], [1, 1], ('a',), False, 0)
-    assert_(list(res_bis.keys()) == [('a', 'c'), ('a', 'd'), ('b',)])
+    assert_(list(iterkeys(res_bis)) == [('a', 'c'), ('a', 'd'), ('b',)])
     eq(res_bis[('a', 'c')], (0.0, 0.0, 0.5, 0.5))
     eq(res_bis[('a', 'd')], (0.0, 0.5, 0.5, 0.5))
     eq(res_bis[('b',)], (0.5, 0, 0.5, 1))
     # starting with a non empty tuple and uneven distribution
     base_rect = {('total',): (0, 0, 1, 1)}
     res = _key_splitting(base_rect, ['a', 'b'], [1, 2], ('total',), True, 0)
-    assert_(list(res.keys()) == [('total',) + (e,) for e in ['a', 'b']])
+    assert_(list(iterkeys(res)) == [('total',) + (e,) for e in ['a', 'b']])
     eq(res[('total', 'a')], (0, 0, 1 / 3, 1))
     eq(res[('total', 'b')], (1 / 3, 0, 2 / 3, 1))
 
@@ -423,27 +430,17 @@ def test_gap_split():
     eq(_split_rect(*pure_square, **conf_h), h_2split)
 
 
-@pytest.mark.matplotlib
-def test_default_arg_index(close_figures):
+@dec.skipif(not have_matplotlib or pandas_old)
+def test_default_arg_index():
     # 2116
+    import pandas as pd
     df = pd.DataFrame({'size' : ['small', 'large', 'large', 'small', 'large',
                                  'small'],
                        'length' : ['long', 'short', 'short', 'long', 'long',
                                    'short']})
     assert_raises(ValueError, mosaic, data=df, title='foobar')
+    pylab.close('all')
 
 
-@pytest.mark.matplotlib
-def test_missing_category(close_figures):
-    # GH5639
-    animal = ['dog', 'dog', 'dog', 'cat', 'dog', 'cat', 'cat',
-              'dog', 'dog', 'cat']
-    size = ['medium', 'large', 'medium', 'medium', 'medium', 'medium',
-            'large', 'large', 'large', 'small']
-    testdata = pd.DataFrame({'animal': animal, 'size': size})
-    testdata['size'] = pd.Categorical(testdata['size'],
-                                      categories=['small', 'medium', 'large'])
-    testdata = testdata.sort_values('size')
-    fig, _ = mosaic(testdata, ['animal', 'size'])
-    bio = BytesIO()
-    fig.savefig(bio, format='png')
+if __name__ == '__main__':
+    run_module_suite()

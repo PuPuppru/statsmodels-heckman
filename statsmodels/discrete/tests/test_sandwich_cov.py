@@ -14,6 +14,7 @@ from statsmodels.genmod.generalized_linear_model import GLM
 from statsmodels.genmod import families
 from statsmodels.genmod.families import links
 from statsmodels.regression.linear_model import OLS
+import statsmodels.stats.sandwich_covariance as sc
 from statsmodels.base.covtype import get_robustcov_results
 import statsmodels.stats.sandwich_covariance as sw
 from statsmodels.tools.tools import add_constant
@@ -33,7 +34,7 @@ data_raw = pd.read_csv(filepath, index_col=False)
 data = data_raw.dropna()
 
 #mod = smd.Poisson.from_formula('accident ~ yr_con + op_75_79', data=dat)
-# Do not use formula for tests against Stata because intercept needs to be last
+# Don't use formula for tests against Stata because intercept needs to be last
 endog = data['accident']
 exog_data = data['yr_con op_75_79'.split()]
 exog = add_constant(exog_data, prepend=False)
@@ -42,7 +43,7 @@ exposure = np.asarray(data['service'])
 
 
 # TODO get the test methods from regression/tests
-class CheckCountRobustMixin:
+class CheckCountRobustMixin(object):
 
 
     def test_basic(self):
@@ -66,26 +67,15 @@ class CheckCountRobustMixin:
     @classmethod
     def get_robust_clu(cls):
         res1 = cls.res1
-        cov_clu = sw.cov_cluster(res1, group)
-        cls.bse_rob = sw.se_cov(cov_clu)
+        cov_clu = sc.cov_cluster(res1, group)
+        cls.bse_rob = sc.se_cov(cov_clu)
 
-        cls.corr_fact = cls.get_correction_factor(res1)
-
-    @classmethod
-    def get_correction_factor(cls, results, sub_kparams=True):
-        mod = results.model
-        nobs, k_vars = mod.exog.shape
-
-        if sub_kparams:
-            # TODO: document why we adjust by k_params for some classes
-            #   but not others.
-            k_params = len(results.params)
-        else:
-            k_params = 0
-
-        corr_fact = (nobs - 1.) / float(nobs - k_params)
+        nobs, k_vars = res1.model.exog.shape
+        k_params = len(res1.params)
+        #n_groups = len(np.unique(group))
+        corr_fact = (nobs-1.) / float(nobs - k_params)
         # for bse we need sqrt of correction factor
-        return np.sqrt(corr_fact)
+        cls.corr_fact = np.sqrt(corr_fact)
 
 
     def test_oth(self):
@@ -142,7 +132,12 @@ class TestPoissonCluGeneric(CheckCountRobustMixin):
                                                   use_self=True)
         cls.bse_rob = cls.res1.bse
 
-        cls.corr_fact = cls.get_correction_factor(cls.res1)
+        nobs, k_vars = res1.model.exog.shape
+        k_params = len(res1.params)
+        #n_groups = len(np.unique(group))
+        corr_fact = (nobs-1.) / float(nobs - k_params)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(corr_fact)
 
 
 class TestPoissonHC1Generic(CheckCountRobustMixin):
@@ -158,9 +153,10 @@ class TestPoissonHC1Generic(CheckCountRobustMixin):
         #res_hc0_ = cls.res1.get_robustcov_results('HC1')
         get_robustcov_results(cls.res1._results, 'HC1', use_self=True)
         cls.bse_rob = cls.res1.bse
-
-        cls.corr_fact = cls.get_correction_factor(cls.res1, sub_kparams=False)
-
+        nobs, k_vars = mod.exog.shape
+        corr_fact = (nobs) / float(nobs - 1.)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(1./corr_fact)
 
 # TODO: refactor xxxFit to full testing results
 class TestPoissonCluFit(CheckCountRobustMixin):
@@ -175,8 +171,6 @@ class TestPoissonCluFit(CheckCountRobustMixin):
         # scaling of cov_params_default to match Stata
         # TODO should the default be changed?
         nobs, k_params = mod.exog.shape
-        # TODO: this is similar but not identical to logic in
-        #   get_correction_factor; can we de-duplicate?
         sc_fact = (nobs-1.) / float(nobs - k_params)
 
         cls.res1 = mod.fit(disp=False, cov_type='cluster',
@@ -219,8 +213,10 @@ class TestPoissonHC1Fit(CheckCountRobustMixin):
         cls.res1 = mod.fit(disp=False, cov_type='HC1')
 
         cls.bse_rob = cls.res1.bse
-
-        cls.corr_fact = cls.get_correction_factor(cls.res1, sub_kparams=False)
+        nobs, k_vars = mod.exog.shape
+        corr_fact = (nobs) / float(nobs - 1.)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(1./corr_fact)
 
 
 class TestPoissonHC1FitExposure(CheckCountRobustMixin):
@@ -232,8 +228,11 @@ class TestPoissonHC1FitExposure(CheckCountRobustMixin):
         cls.res1 = mod.fit(disp=False, cov_type='HC1')
 
         cls.bse_rob = cls.res1.bse
+        nobs, k_vars = mod.exog.shape
+        corr_fact = (nobs) / float(nobs - 1.)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(1./corr_fact)
 
-        cls.corr_fact = cls.get_correction_factor(cls.res1, sub_kparams=False)
 
 
 class TestPoissonCluExposure(CheckCountRobustMixin):
@@ -263,9 +262,14 @@ class TestPoissonCluExposureGeneric(CheckCountRobustMixin):
                                                   df_correction=True,  #TODO has no effect
                                                   use_t=False, #True,
                                                   use_self=True)
-        cls.bse_rob = cls.res1.bse #sw.se_cov(cov_clu)
+        cls.bse_rob = cls.res1.bse #sc.se_cov(cov_clu)
 
-        cls.corr_fact = cls.get_correction_factor(cls.res1)
+        nobs, k_vars = res1.model.exog.shape
+        k_params = len(res1.params)
+        #n_groups = len(np.unique(group))
+        corr_fact = (nobs-1.) / float(nobs - k_params)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(corr_fact)
 
 
 class TestGLMPoissonClu(CheckCountRobustMixin):
@@ -295,7 +299,12 @@ class TestGLMPoissonCluGeneric(CheckCountRobustMixin):
                                                   use_self=True)
         cls.bse_rob = cls.res1.bse
 
-        cls.corr_fact = cls.get_correction_factor(cls.res1)
+        nobs, k_vars = res1.model.exog.shape
+        k_params = len(res1.params)
+        #n_groups = len(np.unique(group))
+        corr_fact = (nobs-1.) / float(nobs - k_params)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(corr_fact)
 
 
 class TestGLMPoissonHC1Generic(CheckCountRobustMixin):
@@ -309,8 +318,10 @@ class TestGLMPoissonHC1Generic(CheckCountRobustMixin):
         #res_hc0_ = cls.res1.get_robustcov_results('HC1')
         get_robustcov_results(cls.res1._results, 'HC1', use_self=True)
         cls.bse_rob = cls.res1.bse
-
-        cls.corr_fact = cls.get_correction_factor(cls.res1, sub_kparams=False)
+        nobs, k_vars = mod.exog.shape
+        corr_fact = (nobs) / float(nobs - 1.)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(1./corr_fact)
 
 
 # TODO: refactor xxxFit to full testing results
@@ -325,7 +336,7 @@ class TestGLMPoissonCluFit(CheckCountRobustMixin):
                                                 use_correction=True,
                                                 df_correction=True),  #TODO has no effect
                                   use_t=False, #True,
-                                  )
+                                                )
 
         # The model results, t_test, ... should also work without
         # normalized_cov_params, see #2209
@@ -334,7 +345,12 @@ class TestGLMPoissonCluFit(CheckCountRobustMixin):
 
         cls.bse_rob = cls.res1.bse
 
-        cls.corr_fact = cls.get_correction_factor(cls.res1)
+        nobs, k_vars = mod.exog.shape
+        k_params = len(cls.res1.params)
+        #n_groups = len(np.unique(group))
+        corr_fact = (nobs-1.) / float(nobs - k_params)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(corr_fact)
 
 
 class TestGLMPoissonHC1Fit(CheckCountRobustMixin):
@@ -346,8 +362,10 @@ class TestGLMPoissonHC1Fit(CheckCountRobustMixin):
         cls.res1 = mod.fit(cov_type='HC1')
 
         cls.bse_rob = cls.res1.bse
-
-        cls.corr_fact = cls.get_correction_factor(cls.res1, sub_kparams=False)
+        nobs, k_vars = mod.exog.shape
+        corr_fact = (nobs) / float(nobs - 1.)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(1./corr_fact)
 
 
 class TestNegbinClu(CheckCountRobustMixin):
@@ -356,7 +374,7 @@ class TestNegbinClu(CheckCountRobustMixin):
     def setup_class(cls):
         cls.res2 = results_st.results_negbin_clu
         mod = smd.NegativeBinomial(endog, exog)
-        cls.res1 = mod.fit(disp=False, gtol=1e-7)
+        cls.res1 = mod.fit(disp=False)
         cls.get_robust_clu()
 
 
@@ -375,9 +393,9 @@ class TestNegbinCluExposure(CheckCountRobustMixin):
 #        mod_nb = smd.NegativeBinomial(endog, exog)
 #        res_nb = mod_nb.fit()
 #
-#        cov_clu_nb = sw.cov_cluster(res_nb, group)
+#        cov_clu_nb = sc.cov_cluster(res_nb, group)
 #        k_params = k_vars + 1
-#        print sw.se_cov(cov_clu_nb / ((nobs-1.) / float(nobs - k_params)))
+#        print sc.se_cov(cov_clu_nb / ((nobs-1.) / float(nobs - k_params)))
 #
 #        wt = res_nb.wald_test(np.eye(len(res_nb.params))[1:3], cov_p=cov_clu_nb/((nobs-1.) / float(nobs - k_params)))
 #        print wt
@@ -390,7 +408,7 @@ class TestNegbinCluGeneric(CheckCountRobustMixin):
     def setup_class(cls):
         cls.res2 = results_st.results_negbin_clu
         mod = smd.NegativeBinomial(endog, exog)
-        cls.res1 = res1 = mod.fit(disp=False, gtol=1e-7)
+        cls.res1 = res1 = mod.fit(disp=False)
 
         get_robustcov_results(cls.res1._results, 'cluster',
                                                   groups=group,
@@ -400,7 +418,12 @@ class TestNegbinCluGeneric(CheckCountRobustMixin):
                                                   use_self=True)
         cls.bse_rob = cls.res1.bse
 
-        cls.corr_fact = cls.get_correction_factor(cls.res1)
+        nobs, k_vars = mod.exog.shape
+        k_params = len(cls.res1.params)
+        #n_groups = len(np.unique(group))
+        corr_fact = (nobs-1.) / float(nobs - k_params)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(corr_fact)
 
 
 class TestNegbinCluFit(CheckCountRobustMixin):
@@ -414,10 +437,15 @@ class TestNegbinCluFit(CheckCountRobustMixin):
                                                 use_correction=True,
                                                 df_correction=True),  #TODO has no effect
                                   use_t=False, #True,
-                                  gtol=1e-7)
+                                  )
         cls.bse_rob = cls.res1.bse
 
-        cls.corr_fact = cls.get_correction_factor(cls.res1)
+        nobs, k_vars = mod.exog.shape
+        k_params = len(cls.res1.params)
+        #n_groups = len(np.unique(group))
+        corr_fact = (nobs-1.) / float(nobs - k_params)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(corr_fact)
 
 
 class TestNegbinCluExposureFit(CheckCountRobustMixin):
@@ -434,87 +462,31 @@ class TestNegbinCluExposureFit(CheckCountRobustMixin):
                                   )
         cls.bse_rob = cls.res1.bse
 
-        cls.corr_fact = cls.get_correction_factor(cls.res1)
+        nobs, k_vars = mod.exog.shape
+        k_params = len(cls.res1.params)
+        #n_groups = len(np.unique(group))
+        corr_fact = (nobs-1.) / float(nobs - k_params)
+        # for bse we need sqrt of correction factor
+        cls.corr_fact = np.sqrt(corr_fact)
 
 
-class CheckDiscreteGLM:
+class CheckDiscreteGLM(object):
     # compare GLM with other models, no verified reference results
 
     def test_basic(self):
-        res1 = self.res1  # GLM model
-        res2 = self.res2  # comparison model, discrete or OLS
+        res1 = self.res1
+        res2 = self.res2
 
         assert_equal(res1.cov_type, self.cov_type)
         assert_equal(res2.cov_type, self.cov_type)
 
-        rtol = getattr(res1, 'rtol', 1e-13)
-        assert_allclose(res1.params, res2.params, rtol=rtol)
-        assert_allclose(res1.bse, res2.bse, rtol=1e-10)
-
-    def test_score_hessian(self):
-        res1 = self.res1
-        res2 = self.res2
-
-        # We need to fix scale in GLM and OLS,
-        # discrete MLE have it always fixed
-        if isinstance(res2.model, OLS):
-            kwds = {'scale': res2.scale}
-        else:
-            kwds = {}
-        if isinstance(res2.model, OLS):
-            sgn = + 1
-        else:
-            sgn = -1  # see #4714
-
-        score1 = res1.model.score(res1.params * 0.98, scale=res1.scale)
-        score2 = res2.model.score(res1.params * 0.98, **kwds)
-        assert_allclose(score1, score2, rtol=1e-13)
-
-        hess1 = res1.model.hessian(res1.params, scale=res1.scale)
-        hess2 = res2.model.hessian(res1.params, **kwds)
-        assert_allclose(hess1, hess2, rtol=1e-10)
-
-        if isinstance(res2.model, OLS):
-            # skip the rest
-            return
-        scoref1 = res1.model.score_factor(res1.params, scale=res1.scale)
-        scoref2 = res2.model.score_factor(res1.params, **kwds)
-        assert_allclose(scoref1, scoref2, rtol=1e-10)
-
-        hessf1 = res1.model.hessian_factor(res1.params, scale=res1.scale)
-        hessf2 = res2.model.hessian_factor(res1.params, **kwds)
-        assert_allclose(sgn * hessf1, hessf2, rtol=1e-10)
-
-    def test_score_test(self):
-        res1 = self.res1
-        res2 = self.res2
-
-        if isinstance(res2.model, OLS):
-            # skip
-            return
-
-        fitted = self.res1.fittedvalues
-        exog_extra = np.column_stack((fitted**2, fitted**3))
-        res_lm1 = res1.score_test(exog_extra, cov_type='nonrobust')
-        res_lm2 = res2.score_test(exog_extra, cov_type='nonrobust')
-        assert_allclose(np.hstack(res_lm1), np.hstack(res_lm2), rtol=5e-7)
-
-
-class TestGLMPoisson(CheckDiscreteGLM):
-
-    @classmethod
-    def setup_class(cls):
-        np.random.seed(987125643)  # not intentional seed
-        endog_count = np.random.poisson(endog)
-        cls.cov_type = 'HC0'
-
-        mod1 = GLM(endog_count, exog, family=families.Poisson())
-        cls.res1 = mod1.fit(cov_type='HC0')
-
-        mod1 = smd.Poisson(endog_count, exog)
-        cls.res2 = mod1.fit(cov_type='HC0')
-
-        cls.res1.rtol = 1e-11
+        assert_allclose(res1.params, res2.params, rtol=1e-13)
+        # bug TODO res1.scale missing ?  in Gaussian/OLS
+        assert_allclose(res1.bse, res2.bse, rtol=1e-13)
+#         if not self.cov_type == 'nonrobust':
+#             assert_allclose(res1.bse * res1.scale, res2.bse, rtol=1e-13)
+#         else:
+#             assert_allclose(res1.bse, res2.bse, rtol=1e-13)
 
 
 class TestGLMLogit(CheckDiscreteGLM):
@@ -531,65 +503,19 @@ class TestGLMLogit(CheckDiscreteGLM):
         cls.res2 = mod1.fit(cov_type='cluster', cov_kwds=dict(groups=group))
 
 
-class TestGLMLogitOffset(CheckDiscreteGLM):
+class T_estGLMProbit(CheckDiscreteGLM):
+    # invalid link. What's Probit as GLM?
 
     @classmethod
     def setup_class(cls):
         endog_bin = (endog > endog.mean()).astype(int)
         cls.cov_type = 'cluster'
-        offset = np.ones(endog_bin.shape[0])
 
-        mod1 = GLM(endog_bin, exog, family=families.Binomial(), offset=offset)
+        mod1 = GLM(endog_bin, exog, family=families.Gaussian(link=links.CDFLink()))
         cls.res1 = mod1.fit(cov_type='cluster', cov_kwds=dict(groups=group))
-
-        mod1 = smd.Logit(endog_bin, exog, offset=offset)
-        cls.res2 = mod1.fit(cov_type='cluster', cov_kwds=dict(groups=group))
-
-class TestGLMProbit(CheckDiscreteGLM):
-
-    @classmethod
-    def setup_class(cls):
-        endog_bin = (endog > endog.mean()).astype(int)
-        cls.cov_type = 'cluster'
-
-        mod1 = GLM(endog_bin, exog, family=families.Binomial(link=links.probit()))
-        cls.res1 = mod1.fit(method='newton',
-                            cov_type='cluster', cov_kwds=dict(groups=group))
 
         mod1 = smd.Probit(endog_bin, exog)
         cls.res2 = mod1.fit(cov_type='cluster', cov_kwds=dict(groups=group))
-        cls.rtol = 1e-6
-
-    def test_score_hessian(self):
-        res1 = self.res1
-        res2 = self.res2
-        # Note scale is fixed at 1, so we do not need to fix it explicitly
-        score1 = res1.model.score(res1.params * 0.98)
-        score2 = res2.model.score(res1.params * 0.98)
-        assert_allclose(score1, score2, rtol=1e-13)
-
-        hess1 = res1.model.hessian(res1.params)
-        hess2 = res2.model.hessian(res1.params)
-        assert_allclose(hess1, hess2, rtol=1e-13)
-
-
-class TestGLMProbitOffset(CheckDiscreteGLM):
-
-    @classmethod
-    def setup_class(cls):
-        endog_bin = (endog > endog.mean()).astype(int)
-        cls.cov_type = 'cluster'
-        offset = np.ones(endog_bin.shape[0])
-
-        mod1 = GLM(endog_bin, exog,
-                   family=families.Binomial(link=links.probit()),
-                   offset=offset)
-        cls.res1 = mod1.fit(method='newton',
-                            cov_type='cluster', cov_kwds=dict(groups=group))
-
-        mod1 = smd.Probit(endog_bin, exog, offset=offset)
-        cls.res2 = mod1.fit(cov_type='cluster', cov_kwds=dict(groups=group))
-        cls.rtol = 1e-6
 
 
 class TestGLMGaussNonRobust(CheckDiscreteGLM):
@@ -646,23 +572,6 @@ class TestGLMGaussHAC(CheckDiscreteGLM):
         cls.res2 = mod2.fit(cov_type='HAC', cov_kwds=kwds)
 
 
-class TestGLMGaussHAC2(CheckDiscreteGLM):
-
-    @classmethod
-    def setup_class(cls):
-
-        cls.cov_type = 'HAC'
-
-        # check kernel specified as string
-        kwds = {'kernel': 'bartlett', 'maxlags': 2}
-        mod1 = GLM(endog, exog, family=families.Gaussian())
-        cls.res1 = mod1.fit(cov_type='HAC', cov_kwds=kwds)
-
-        mod2 = OLS(endog, exog)
-        kwds2 = {'maxlags': 2}
-        cls.res2 = mod2.fit(cov_type='HAC', cov_kwds=kwds2)
-
-
 class TestGLMGaussHACUniform(CheckDiscreteGLM):
 
     @classmethod
@@ -684,7 +593,7 @@ class TestGLMGaussHACUniform(CheckDiscreteGLM):
     def test_cov_options(self):
 
         # check keyword `weights_func
-        kwdsa = {'weights_func': sw.weights_uniform, 'maxlags': 2}
+        kwdsa = {'weights_func':sw.weights_uniform, 'maxlags':2}
         res1a = self.res1.model.fit(cov_type='HAC', cov_kwds=kwdsa)
         res2a = self.res2.model.fit(cov_type='HAC', cov_kwds=kwdsa)
         assert_allclose(res1a.bse, self.res1.bse, rtol=1e-12)
@@ -696,7 +605,7 @@ class TestGLMGaussHACUniform(CheckDiscreteGLM):
 
         assert_(res1a.cov_kwds['weights_func'] is sw.weights_uniform)
 
-        kwdsb = {'kernel': sw.weights_bartlett, 'maxlags': 2}
+        kwdsb = {'kernel':sw.weights_bartlett, 'maxlags':2}
         res1a = self.res1.model.fit(cov_type='HAC', cov_kwds=kwdsb)
         res2a = self.res2.model.fit(cov_type='HAC', cov_kwds=kwdsb)
         assert_allclose(res1a.bse, res2a.bse, rtol=1e-12)
@@ -704,24 +613,6 @@ class TestGLMGaussHACUniform(CheckDiscreteGLM):
         # regression test for bse values
         bse = np.array([  2.502264,  3.697807,  9.193303])
         assert_allclose(res1a.bse, bse, rtol=1e-6)
-
-
-
-class TestGLMGaussHACUniform2(TestGLMGaussHACUniform):
-
-    @classmethod
-    def setup_class(cls):
-
-        cls.cov_type = 'HAC'
-
-        kwds={'kernel': sw.weights_uniform, 'maxlags': 2}
-        mod1 = GLM(endog, exog, family=families.Gaussian())
-        cls.res1 = mod1.fit(cov_type='HAC', cov_kwds=kwds)
-
-        # check kernel as string
-        mod2 = OLS(endog, exog)
-        kwds2 = {'kernel': 'uniform', 'maxlags': 2}
-        cls.res2 = mod2.fit(cov_type='HAC', cov_kwds=kwds)
 
 
 class TestGLMGaussHACPanel(CheckDiscreteGLM):
@@ -756,7 +647,7 @@ class TestGLMGaussHACPanelGroups(CheckDiscreteGLM):
         # time index is just made up to have a test case
         groups = np.repeat(np.arange(5), 7)[:-1]
         mod1 = GLM(endog.copy(), exog.copy(), family=families.Gaussian())
-        kwds = dict(groups=pd.Series(groups),  # check for #3606
+        kwds = dict(groups=groups,
                     maxlags=2,
                     kernel=sw.weights_uniform,
                     use_correction='hac',
@@ -775,7 +666,7 @@ class TestGLMGaussHACGroupsum(CheckDiscreteGLM):
         # time index is just made up to have a test case
         time = np.tile(np.arange(7), 5)[:-1]
         mod1 = GLM(endog, exog, family=families.Gaussian())
-        kwds = dict(time=pd.Series(time),  # check for #3606
+        kwds = dict(time=time,
                     maxlags=2,
                     use_correction='hac',
                     df_correction=False)
@@ -788,3 +679,13 @@ class TestGLMGaussHACGroupsum(CheckDiscreteGLM):
     def test_kwd(self):
         # test corrected keyword name
         assert_allclose(self.res1b.bse, self.res1.bse, rtol=1e-12)
+
+
+
+if __name__ == '__main__':
+    tt = TestPoissonClu()
+    tt.setup_class()
+    tt.test_basic()
+    tt = TestNegbinClu()
+    tt.setup_class()
+    tt.test_basic()

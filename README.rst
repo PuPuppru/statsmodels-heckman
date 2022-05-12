@@ -1,10 +1,9 @@
-|PyPI Version| |Conda Version| |License| |Azure CI Build Status|
-|Codecov Coverage| |Coveralls Coverage| |PyPI downloads| |Conda downloads|
+|Travis Build Status| |Appveyor Build Status| |Coveralls Coverage|
 
-About statsmodels
+About Statsmodels
 =================
 
-statsmodels is a Python package that provides a complement to scipy for
+Statsmodels is a Python package that provides a complement to scipy for
 statistical computations including descriptive statistics and estimation
 and inference for statistical models.
 
@@ -14,18 +13,19 @@ Documentation
 
 The documentation for the latest release is at
 
-https://www.statsmodels.org/stable/
+   http://www.statsmodels.org/stable/
 
 The documentation for the development version is at
 
-https://www.statsmodels.org/dev/
+   http://www.statsmodels.org/dev/
 
 Recent improvements are highlighted in the release notes
 
-https://www.statsmodels.org/stable/release/
+   http://www.statsmodels.org/stable/release/version0.8.html
 
-Backups of documentation are available at https://statsmodels.github.io/stable/
-and https://statsmodels.github.io/dev/.
+Backups of documentation are available at http://statsmodels.github.io/stable/
+and http://statsmodels.github.io/dev/.
+
 
 
 Main Features
@@ -38,20 +38,17 @@ Main Features
   - Weighted least squares
   - Least squares with autoregressive errors
   - Quantile regression
-  - Recursive least squares
 
 * Mixed Linear Model with mixed effects and variance components
 * GLM: Generalized linear models with support for all of the one-parameter
   exponential family distributions
-* Bayesian Mixed GLM for Binomial and Poisson
 * GEE: Generalized Estimating Equations for one-way clustered or longitudinal data
 * Discrete models:
 
   - Logit and Probit
   - Multinomial logit (MNLogit)
-  - Poisson and Generalized Poisson regression
+  - Poisson regresion
   - Negative Binomial regression
-  - Zero-Inflated Count models
 
 * RLM: Robust linear models with support for several M-estimators.
 * Time Series Analysis: models for time series analysis
@@ -61,13 +58,10 @@ Main Features
     - Seasonal ARIMA and ARIMAX models
     - VARMA and VARMAX models
     - Dynamic Factor models
-    - Unobserved Component models
 
   - Markov switching models (MSAR), also known as Hidden Markov Models (HMM)
   - Univariate time series analysis: AR, ARIMA
   - Vector autoregressive models, VAR and structural VAR
-  - Vector error correction model, VECM
-  - exponential smoothing, Holt-Winters
   - Hypothesis tests for time series: unit root, cointegration and others
   - Descriptive statistics and process models for time series analysis
 
@@ -77,14 +71,7 @@ Main Features
   - Survivor function estimation (Kaplan-Meier)
   - Cumulative incidence function estimation
 
-* Multivariate:
-
-  - Principal Component Analysis with missing data
-  - Factor Analysis with rotation
-  - MANOVA
-  - Canonical Correlation
-
-* Nonparametric statistics: Univariate and multivariate kernel density estimators
+* Nonparametric statistics: (Univariate) kernel density estimators
 * Datasets: Datasets used for examples and in testing
 * Statistics: a wide range of statistical tests
 
@@ -93,18 +80,17 @@ Main Features
   - functions for multiple testing
   - various additional statistical tests
 
-* Imputation with MICE, regression on order statistic and Gaussian imputation
+* Imputation with MICE and regression on order statistic
 * Mediation analysis
-* Graphics includes plot functions for visual analysis of data and model results
-
+* Principal Component Analysis with missing data
 * I/O
 
-  - Tools for reading Stata .dta files, but pandas has a more recent version
+  - Tools for reading Stata .dta files into numpy arrays.
   - Table output to ascii, latex, and html
 
 * Miscellaneous models
 * Sandbox: statsmodels contains a sandbox folder with code in various stages of
-  development and testing which is not considered "production ready".  This covers
+  developement and testing which is not considered "production ready".   This covers
   among others
 
   - Generalized method of moments (GMM) estimators
@@ -115,42 +101,32 @@ Main Features
 
 How to get it
 =============
-The main branch on GitHub is the most up to date code
+The master branch on GitHub is the most up to date code
 
-https://www.github.com/statsmodels/statsmodels
+    https://www.github.com/statsmodels/statsmodels
 
 Source download of release tags are available on GitHub
 
-https://github.com/statsmodels/statsmodels/tags
+    https://github.com/statsmodels/statsmodels/tags
 
 Binaries and source distributions are available from PyPi
 
-https://pypi.org/project/statsmodels/
+    http://pypi.python.org/pypi/statsmodels/
 
 Binaries can be installed in Anaconda
 
-conda install statsmodels
+    conda install statsmodels
 
+Development snapshots are also available in Anaconda (infrequently updated)
+
+    conda install -c https://conda.binstar.org/statsmodels statsmodels
 
 Installing from sources
 =======================
 
 See INSTALL.txt for requirements or see the documentation
 
-https://statsmodels.github.io/dev/install.html
-
-Contributing
-============
-Contributions in any form are welcome, including:
-
-* Documentation improvements
-* Additional tests
-* New features to existing models
-* New models
-
-https://www.statsmodels.org/stable/dev/test_notes
-
-for instructions on installing statsmodels in *editable* mode.
+    http://statsmodels.github.io/dev/install.html
 
 License
 =======
@@ -160,34 +136,23 @@ Modified BSD (3-clause)
 Discussion and Development
 ==========================
 
-Discussions take place on the mailing list
+Discussions take place on our mailing list.
 
-https://groups.google.com/group/pystatsmodels
+    http://groups.google.com/group/pystatsmodels
 
-and in the issue tracker. We are very interested in feedback
-about usability and suggestions for improvements.
+We are very interested in feedback about usability and suggestions for
+improvements.
 
 Bug Reports
 ===========
 
 Bug reports can be submitted to the issue tracker at
 
-https://github.com/statsmodels/statsmodels/issues
+    https://github.com/statsmodels/statsmodels/issues
 
-.. |Azure CI Build Status| image:: https://dev.azure.com/statsmodels/statsmodels-testing/_apis/build/status/statsmodels.statsmodels?branchName=main
-   :target: https://dev.azure.com/statsmodels/statsmodels-testing/_build/latest?definitionId=1&branchName=main
-.. |Codecov Coverage| image:: https://codecov.io/gh/statsmodels/statsmodels/branch/main/graph/badge.svg
-   :target: https://codecov.io/gh/statsmodels/statsmodels
-.. |Coveralls Coverage| image:: https://coveralls.io/repos/github/statsmodels/statsmodels/badge.svg?branch=main
-   :target: https://coveralls.io/github/statsmodels/statsmodels?branch=main
-.. |PyPI downloads| image:: https://img.shields.io/pypi/dm/statsmodels?label=PyPI%20Downloads
-   :alt: PyPI - Downloads
-   :target: https://pypi.org/project/statsmodels/
-.. |Conda downloads| image:: https://img.shields.io/conda/dn/conda-forge/statsmodels.svg?label=Conda%20downloads
-   :target: https://anaconda.org/conda-forge/statsmodels/
-.. |PyPI Version| image:: https://img.shields.io/pypi/v/statsmodels.svg
-   :target: https://pypi.org/project/statsmodels/
-.. |Conda Version| image:: https://anaconda.org/conda-forge/statsmodels/badges/version.svg
-   :target: https://anaconda.org/conda-forge/statsmodels/
-.. |License| image:: https://img.shields.io/pypi/l/statsmodels.svg
-   :target: https://github.com/statsmodels/statsmodels/blob/main/LICENSE.txt
+.. |Travis Build Status| image:: https://travis-ci.org/statsmodels/statsmodels.svg?branch=master
+   :target: https://travis-ci.org/statsmodels/statsmodels
+.. |Appveyor Build Status| image:: https://ci.appveyor.com/api/projects/status/gx18sd2wc63mfcuc/branch/master?svg=true
+   :target: https://ci.appveyor.com/project/josef-pkt/statsmodels/branch/master
+.. |Coveralls Coverage| image:: https://coveralls.io/repos/github/statsmodels/statsmodels/badge.svg?branch=master
+   :target: https://coveralls.io/github/statsmodels/statsmodels?branch=master

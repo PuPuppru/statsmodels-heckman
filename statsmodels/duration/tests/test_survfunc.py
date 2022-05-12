@@ -1,25 +1,27 @@
-import os
-
 import numpy as np
 from statsmodels.duration.survfunc import (
     SurvfuncRight, survdiff, plot_survfunc,
     CumIncidenceRight)
 from numpy.testing import assert_allclose
+from numpy.testing import dec
 import pandas as pd
-import pytest
+import os
 
 # If true, the output is written to a multi-page pdf file.
 pdf_output = False
 
 try:
     import matplotlib.pyplot as plt
+    have_matplotlib = True
 except ImportError:
-    pass
+    have_matplotlib = False
 
 
 def close_or_save(pdf, fig):
     if pdf_output:
         pdf.savefig(fig)
+    else:
+        plt.close(fig)
 
 
 """
@@ -148,7 +150,6 @@ def test_survdiff():
     # used for non G-rho family tests but does not seem to support
     # stratification)
 
-    full_df = bmt.copy()
     df = bmt[bmt.Group != "ALL"].copy()
 
     # Not stratified
@@ -165,11 +166,6 @@ def test_survdiff():
                        fh_p=1)
     assert_allclose(stat, 14.84500, atol=1e-4, rtol=1e-4)
 
-    # Not stratified, >2 groups
-    stat, p = survdiff(full_df["T"], full_df.Status, full_df.Group,
-                       weight_type="fh", fh_p=1)
-    assert_allclose(stat, 15.67247, atol=1e-4, rtol=1e-4)
-
     # 5 strata
     strata = np.arange(df.shape[0]) % 5
     df["strata"] = strata
@@ -181,13 +177,6 @@ def test_survdiff():
     stat, p = survdiff(df["T"], df.Status, df.Group, strata=df.strata,
                        weight_type="fh", fh_p=1)
     assert_allclose(stat, 12.73565, atol=1e-4, rtol=1e-4)
-
-    # 5 strata, >2 groups
-    full_strata = np.arange(full_df.shape[0]) % 5
-    full_df["strata"] = full_strata
-    stat, p = survdiff(full_df["T"], full_df.Status, full_df.Group,
-                       strata=full_df.strata, weight_type="fh", fh_p=0.5)
-    assert_allclose(stat, 13.56793, atol=1e-4, rtol=1e-4)
 
     # 8 strata
     df["strata"] = np.arange(df.shape[0]) % 8
@@ -201,8 +190,8 @@ def test_survdiff():
     assert_allclose(stat, 13.35259, atol=1e-4, rtol=1e-4)
 
 
-@pytest.mark.matplotlib
-def test_plot_km(close_figures):
+@dec.skipif(not have_matplotlib)
+def test_plot_km():
 
     if pdf_output:
         from matplotlib.backends.backend_pdf import PdfPages
@@ -311,10 +300,6 @@ def test_incidence():
     #
     # The standard errors agree with Stata, not with R (cmprisk
     # package), which uses a different SE formula from Aalen (1978)
-    #
-    # To check with Stata:
-    # stset ftime failure(fstat==1)
-    # stcompet ci=ci, compet1(2)
 
     ftime = np.r_[1, 1, 2, 4, 4, 4, 6, 6, 7, 8, 9, 9, 9, 1, 2, 2, 4, 4]
     fstat = np.r_[1, 1, 1, 2, 2, 2, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -461,105 +446,3 @@ def test_survdiff_entry_3():
     z, p = survdiff(ti, st, gr, entry=entry)
     assert_allclose(z, 6.75082959)
     assert_allclose(p, 0.00937041)
-
-
-def test_incidence2():
-    # Check that the cumulative incidence functions for all competing
-    # risks sum to the complementary survival function.
-
-    np.random.seed(2423)
-    n = 200
-    time = -np.log(np.random.uniform(size=n))
-    status = np.random.randint(0, 3, size=n)
-    ii = np.argsort(time)
-    time = time[ii]
-    status = status[ii]
-    ci = CumIncidenceRight(time, status)
-    statusa = 1*(status >= 1)
-    sf = SurvfuncRight(time, statusa)
-    x = 1 - sf.surv_prob
-    y = (ci.cinc[0] + ci.cinc[1])[np.flatnonzero(statusa)]
-    assert_allclose(x, y)
-
-
-def test_kernel_survfunc1():
-    # Regression test
-    n = 100
-    np.random.seed(3434)
-    x = np.random.normal(size=(n, 3))
-    time = np.random.uniform(size=n)
-    status = np.random.randint(0, 2, size=n)
-
-    result = SurvfuncRight(time, status, exog=x)
-
-    timex = np.r_[0.30721103, 0.0515439, 0.69246897, 0.16446079, 0.31308528]
-    sprob = np.r_[0.98948277, 0.98162275, 0.97129237, 0.96044668, 0.95030368]
-
-    assert_allclose(result.time[0:5], timex)
-    assert_allclose(result.surv_prob[0:5], sprob)
-
-
-def test_kernel_survfunc2():
-    # Check that when bandwidth is very large, the kernel procedure
-    # agrees with standard KM. (Note: the results do not agree
-    # perfectly when there are tied times).
-
-    n = 100
-    np.random.seed(3434)
-    x = np.random.normal(size=(n, 3))
-    time = np.random.uniform(0, 10, size=n)
-    status = np.random.randint(0, 2, size=n)
-
-    resultkm = SurvfuncRight(time, status)
-    result = SurvfuncRight(time, status, exog=x, bw_factor=10000)
-
-    assert_allclose(resultkm.surv_times, result.surv_times)
-    assert_allclose(resultkm.surv_prob, result.surv_prob, rtol=1e-6, atol=1e-6)
-
-
-@pytest.mark.smoke
-def test_kernel_survfunc3():
-    # cases with tied times
-
-    n = 100
-    np.random.seed(3434)
-    x = np.random.normal(size=(n, 3))
-    time = np.random.randint(0, 10, size=n)
-    status = np.random.randint(0, 2, size=n)
-    SurvfuncRight(time, status, exog=x, bw_factor=10000)
-    SurvfuncRight(time, status, exog=x, bw_factor=np.r_[10000, 10000])
-
-
-def test_kernel_cumincidence1():
-    # Check that when the bandwidth is very large, the kernel
-    # procedure agrees with standard cumulative incidence
-    # calculations. (Note: the results do not agree perfectly when
-    # there are tied times).
-
-    n = 100
-    np.random.seed(3434)
-    x = np.random.normal(size=(n, 3))
-    time = np.random.uniform(0, 10, size=n)
-    status = np.random.randint(0, 3, size=n)
-
-    result1 = CumIncidenceRight(time, status)
-
-    for dimred in False, True:
-        result2 = CumIncidenceRight(time, status, exog=x, bw_factor=10000,
-                                    dimred=dimred)
-
-        assert_allclose(result1.times, result2.times)
-        for k in 0, 1:
-            assert_allclose(result1.cinc[k], result2.cinc[k], rtol=1e-5)
-
-
-@pytest.mark.smoke
-def test_kernel_cumincidence2():
-    # cases with tied times
-
-    n = 100
-    np.random.seed(3434)
-    x = np.random.normal(size=(n, 3))
-    time = np.random.randint(0, 10, size=n)
-    status = np.random.randint(0, 3, size=n)
-    CumIncidenceRight(time, status, exog=x, bw_factor=10000)

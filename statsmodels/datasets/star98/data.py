@@ -1,5 +1,4 @@
 """Star98 Educational Testing dataset."""
-from statsmodels.datasets import utils as du
 
 __docformat__ = 'restructuredtext'
 
@@ -65,7 +64,9 @@ NOTE        = """::
         PERSPEN_PTRATIO_PCTAF
 """
 
-
+from numpy import recfromtxt, column_stack, array
+from statsmodels.datasets import utils as du
+from os.path import dirname, abspath
 
 def load():
     """
@@ -76,26 +77,31 @@ def load():
     Load instance:
         a class of the data with array attrbutes 'endog' and 'exog'
     """
-    return load_pandas()
-
+    data = _get_data()
+    return du.process_recarray(data, endog_idx=[0, 1], dtype=float)
 
 def load_pandas():
     data = _get_data()
-    return du.process_pandas(data, endog_idx=['NABOVE', 'NBELOW'])
-
+    return du.process_recarray_pandas(data, endog_idx=['NABOVE', 'NBELOW'],
+                                      dtype=float)
 
 def _get_data():
-    data = du.load_csv(__file__, 'star98.csv')
+    filepath = dirname(abspath(__file__))
+##### EDIT THE FOLLOWING TO POINT TO DatasetName.csv #####
     names = ["NABOVE","NBELOW","LOWINC","PERASIAN","PERBLACK","PERHISP",
             "PERMINTE","AVYRSEXP","AVSALK","PERSPENK","PTRATIO","PCTAF",
             "PCTCHRT","PCTYRRND","PERMINTE_AVYRSEXP","PERMINTE_AVSAL",
             "AVYRSEXP_AVSAL","PERSPEN_PTRATIO","PERSPEN_PCTAF","PTRATIO_PCTAF",
             "PERMINTE_AVYRSEXP_AVSAL","PERSPEN_PTRATIO_PCTAF"]
-    data.columns = names
-    nabove = data['NABOVE'].copy()
-    nbelow = data['NBELOW'].copy()
+    with open(filepath + '/star98.csv',"rb") as f:
+        data = recfromtxt(f, delimiter=",",
+                          names=names, skip_header=1, dtype=float)
 
-    data['NABOVE'] = nbelow  # successes
-    data['NBELOW'] = nabove - nbelow  # now failures
+        # careful now
+        nabove = data['NABOVE'].copy()
+        nbelow = data['NBELOW'].copy()
+
+        data['NABOVE'] = nbelow # successes
+        data['NBELOW'] = nabove - nbelow # now failures
 
     return data

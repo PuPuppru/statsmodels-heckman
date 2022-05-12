@@ -1,5 +1,4 @@
 """US Capital Punishment dataset."""
-from statsmodels.datasets import utils as du
 
 __docformat__ = 'restructuredtext'
 
@@ -43,19 +42,9 @@ NOTE        = """::
     State names are included in the data file, though not returned by load.
 """
 
-
-def load_pandas():
-    """
-    Load the cpunish data and return a Dataset class.
-
-    Returns
-    -------
-    Dataset
-        See DATASET_PROPOSAL.txt for more information.
-    """
-    data = _get_data()
-    return du.process_pandas(data, endog_idx=0)
-
+from numpy import recfromtxt, column_stack, array
+from statsmodels.datasets import utils as du
+from os.path import dirname, abspath
 
 def load():
     """
@@ -63,13 +52,27 @@ def load():
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
-    return load_pandas()
+    data = _get_data()
+    return du.process_recarray(data, endog_idx=0, dtype=float)
 
+def load_pandas():
+    """
+    Load the cpunish data and return a Dataset class.
+
+    Returns
+    -------
+    Dataset instance:
+        See DATASET_PROPOSAL.txt for more information.
+    """
+    data = _get_data()
+    return du.process_recarray_pandas(data, endog_idx=0, dtype=float)
 
 def _get_data():
-    data = du.load_csv(__file__, 'cpunish.csv')
-    data = data.iloc[:, 1:8].astype(float)
+    filepath = dirname(abspath(__file__))
+    with open(filepath + '/cpunish.csv', 'rb') as f:
+        data = recfromtxt(f, delimiter=",",
+                          names=True, dtype=float, usecols=(1,2,3,4,5,6,7))
     return data

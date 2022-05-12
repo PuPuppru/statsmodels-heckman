@@ -1,9 +1,8 @@
 import numpy as np
 import numpy.testing as npt
-from numpy.testing import assert_raises
 from statsmodels.distributions import StepFunction, monotone_fn_inverter
 
-class TestDistributions:
+class TestDistributions(npt.TestCase):
 
     def test_StepFunction(self):
         x = np.arange(20)
@@ -15,10 +14,10 @@ class TestDistributions:
     def test_StepFunctionBadShape(self):
         x = np.arange(20)
         y = np.arange(21)
-        assert_raises(ValueError, StepFunction, x, y)
+        self.assertRaises(ValueError, StepFunction, x, y)
         x = np.zeros((2, 2))
         y = np.zeros((2, 2))
-        assert_raises(ValueError, StepFunction, x, y)
+        self.assertRaises(ValueError, StepFunction, x, y)
 
     def test_StepFunctionValueSideRight(self):
         x = np.arange(20)
@@ -42,3 +41,4 @@ class TestDistributions:
         f = monotone_fn_inverter(fn, x)
         npt.assert_array_equal(f.y, x[::-1])
         npt.assert_array_equal(f.x, y[::-1])
+

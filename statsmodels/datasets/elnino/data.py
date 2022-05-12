@@ -1,5 +1,4 @@
 """El Nino dataset, 1950 - 2010"""
-from statsmodels.datasets import utils as du
 
 __docformat__ = 'restructuredtext'
 
@@ -35,10 +34,11 @@ NOTE = """::
 """
 
 
-def load_pandas():
-    data = _get_data()
-    dataset = du.Dataset(data=data, names=list(data.columns))
-    return dataset
+from numpy import recfromtxt, column_stack, array
+from pandas import DataFrame
+
+from statsmodels.datasets.utils import Dataset
+from os.path import dirname, abspath
 
 
 def load():
@@ -47,15 +47,28 @@ def load():
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
 
     Notes
     -----
     The elnino Dataset instance does not contain endog and exog attributes.
     """
-    return load_pandas()
+    data = _get_data()
+    names = data.dtype.names
+    dataset = Dataset(data=data, names=names)
+    return dataset
+
+
+def load_pandas():
+    dataset = load()
+    dataset.data = DataFrame(dataset.data)
+    return dataset
 
 
 def _get_data():
-    return du.load_csv(__file__, 'elnino.csv', convert_float=True)
+    filepath = dirname(abspath(__file__))
+    with open(filepath + '/elnino.csv', 'rb') as f:
+        data = recfromtxt(f, delimiter=",",
+                          names=True, dtype=float)
+    return data

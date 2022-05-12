@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-from io import StringIO
+
+from statsmodels.compat.python import StringIO
 
 import numpy as np
 
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
-from pandas import read_csv
+from pandas import read_table
 
 kidney_table = StringIO("""Days      Duration Weight ID
     0.0      1      1      1
@@ -71,13 +72,13 @@ kidney_table = StringIO("""Days      Duration Weight ID
 """)
 
 kidney_table.seek(0)
-kidney_table = read_csv(kidney_table, sep=r"\s+", engine='python').astype(int)
+kidney_table = read_table(kidney_table, sep="\s+")
 
-class TestAnovaLM:
+class TestAnovaLM(object):
     @classmethod
-    def setup_class(cls):
+    def setupClass(cls):
         # kidney data taken from JT's course
-        # do not know the license
+        # don't know the license
         cls.data = kidney_table
         cls.kidney_lm = ols('np.log(Days+1) ~ C(Duration) * C(Weight)',
                         data=cls.data).fit()
@@ -96,11 +97,11 @@ class TestAnovaLM:
         np.testing.assert_almost_equal(results['PR(>F)'].values, pr_f)
 
 
-class TestAnovaLMNoconstant:
+class TestAnovaLMNoconstant(object):
     @classmethod
-    def setup_class(cls):
+    def setupClass(cls):
         # kidney data taken from JT's course
-        # do not know the license
+        # don't know the license
         cls.data = kidney_table
         cls.kidney_lm = ols('np.log(Days+1) ~ C(Duration) * C(Weight) - 1',
                         data=cls.data).fit()
@@ -270,7 +271,7 @@ class TestAnova2Noconstant(TestAnovaLM):
 
 
 class TestAnova2HC0(TestAnovaLM):
-    #NOTE: R does not return SSq with robust covariance. Why?
+    #NOTE: R doesn't return SSq with robust covariance. Why?
     # drop some observations to make an unbalanced, disproportionate panel
     # to make sure things are okay
     def test_results(self):
@@ -407,7 +408,7 @@ class TestAnova3(TestAnovaLM):
         np.testing.assert_almost_equal(results['PR(>F)'].values, PrF)
 
 class TestAnova3HC0(TestAnovaLM):
-    #NOTE: R does not return SSq with robust covariance. Why?
+    #NOTE: R doesn't return SSq with robust covariance. Why?
     # drop some observations to make an unbalanced, disproportionate panel
     # to make sure things are okay
     def test_results(self):
@@ -514,3 +515,7 @@ class TestAnova3HC3(TestAnovaLM):
         #np.testing.assert_almost_equal(results['sum_sq'].values, Sum_Sq, 4)
         np.testing.assert_almost_equal(results['F'].values, F, 4)
         np.testing.assert_almost_equal(results['PR(>F)'].values, PrF)
+
+if __name__ == "__main__":
+    import nose
+    nose.runmodule(argv=[__file__, '-vvs', '-x', '--pdb-failure'], exit=False)

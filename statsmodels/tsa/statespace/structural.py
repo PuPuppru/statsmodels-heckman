@@ -1,29 +1,29 @@
 """
 Univariate structural time series models
 
-TODO: tests: "** On entry to DLASCL, parameter number  4 had an illegal value"
-
 Author: Chad Fulton
 License: Simplified-BSD
 """
+from __future__ import division, absolute_import, print_function
 
 from warnings import warn
+from statsmodels.compat.collections import OrderedDict
 
 import numpy as np
-
-from statsmodels.compat.pandas import Appender
-from statsmodels.tools.tools import Bunch
-from statsmodels.tools.sm_exceptions import OutputWarning, SpecificationWarning
-import statsmodels.base.wrapper as wrap
-
+import pandas as pd
 from statsmodels.tsa.filters.hp_filter import hpfilter
+from statsmodels.tools.data import _is_using_pandas
 from statsmodels.tsa.tsatools import lagmat
-
 from .mlemodel import MLEModel, MLEResults, MLEResultsWrapper
-from .initialization import Initialization
+from scipy.linalg import solve_discrete_lyapunov
+from statsmodels.tools.tools import Bunch
+from statsmodels.tools.sm_exceptions import (ValueWarning, OutputWarning,
+                                             SpecificationWarning)
 from .tools import (
     companion_matrix, constrain_stationary_univariate,
-    unconstrain_stationary_univariate, prepare_exog)
+    unconstrain_stationary_univariate
+)
+import statsmodels.base.wrapper as wrap
 
 _mask_map = {
     1: 'irregular',
@@ -52,29 +52,20 @@ class UnobservedComponents(MLEModel):
     Parameters
     ----------
 
-    endog : array_like
-        The observed time-series process :math:`y`
-    level : {bool, str}, optional
+    level : bool or string, optional
         Whether or not to include a level component. Default is False. Can also
         be a string specification of the level / trend component; see Notes
         for available model specification strings.
     trend : bool, optional
         Whether or not to include a trend component. Default is False. If True,
         `level` must also be True.
-    seasonal : {int, None}, optional
+    seasonal : int or None, optional
         The period of the seasonal component, if any. Default is None.
-    freq_seasonal : {list[dict], None}, optional.
-        Whether (and how) to model seasonal component(s) with trig. functions.
-        If specified, there is one dictionary for each frequency-domain
-        seasonal component.  Each dictionary must have the key, value pair for
-        'period' -- integer and may have a key, value pair for
-        'harmonics' -- integer. If 'harmonics' is not specified in any of the
-        dictionaries, it defaults to the floor of period/2.
     cycle : bool, optional
         Whether or not to include a cycle component. Default is False.
-    autoregressive : {int, None}, optional
+    ar : int or None, optional
         The order of the autoregressive component. Default is None.
-    exog : {array_like, None}, optional
+    exog : array_like or None, optional
         Exogenous variables.
     irregular : bool, optional
         Whether or not to include an irregular component. Default is False.
@@ -83,11 +74,7 @@ class UnobservedComponents(MLEModel):
     stochastic_trend : bool, optional
         Whether or not any trend component is stochastic. Default is False.
     stochastic_seasonal : bool, optional
-        Whether or not any seasonal component is stochastic. Default is True.
-    stochastic_freq_seasonal : list[bool], optional
-        Whether or not each seasonal component(s) is (are) stochastic.  Default
-        is True for each component.  The list should be of the same length as
-        freq_seasonal.
+        Whether or not any seasonal component is stochastic. Default is False.
     stochastic_cycle : bool, optional
         Whether or not any cycle component is stochastic. Default is False.
     damped_cycle : bool, optional
@@ -102,20 +89,6 @@ class UnobservedComponents(MLEModel):
         allow the cyclical component to be between 1.5 and 12 years; depending
         on the frequency of the endogenous variable, this will imply different
         specific bounds.
-    mle_regression : bool, optional
-        Whether or not to estimate regression coefficients by maximum likelihood
-        as one of hyperparameters. Default is True.
-        If False, the regression coefficients are estimated by recursive OLS,
-        included in the state vector.
-    use_exact_diffuse : bool, optional
-        Whether or not to use exact diffuse initialization for non-stationary
-        states. Default is False (in which case approximate diffuse
-        initialization is used).
-
-    See Also
-    --------
-    statsmodels.tsa.statespace.structural.UnobservedComponentsResults
-    statsmodels.tsa.statespace.mlemodel.MLEModel
 
     Notes
     -----
@@ -167,11 +140,11 @@ class UnobservedComponents(MLEModel):
     +----------------------------------+--------------------------------------+--------------------+--------------------------------------------------+
     | Model name                       | Full string syntax                   | Abbreviated syntax | Model                                            |
     +==================================+======================================+====================+==================================================+
-    | No trend                         | `'irregular'`                        | `'ntrend'`         | .. math:: y_t = \varepsilon_t                    |
+    | No trend                         | `'irregular'`                        | `'ntrend'`         | .. math:: y_t &= \varepsilon_t                   |
     +----------------------------------+--------------------------------------+--------------------+--------------------------------------------------+
-    | Fixed intercept                  | `'fixed intercept'`                  |                    | .. math:: y_t = \mu                              |
+    | Fixed intercept                  | `'fixed intercept'`                  |                    | .. math:: y_t &= \mu                             |
     +----------------------------------+--------------------------------------+--------------------+--------------------------------------------------+
-    | Deterministic constant           | `'deterministic constant'`           | `'dconstant'`      | .. math:: y_t = \mu + \varepsilon_t              |
+    | Deterministic constant           | `'deterministic constant'`           | `'dconstant'`      | .. math:: y_t &= \mu + \varepsilon_t             |
     +----------------------------------+--------------------------------------+--------------------+--------------------------------------------------+
     | Local level                      | `'local level'`                      | `'llevel'`         | .. math:: y_t &= \mu_t + \varepsilon_t \\        |
     |                                  |                                      |                    |     \mu_t &= \mu_{t-1} + \eta_t                  |
@@ -208,7 +181,7 @@ class UnobservedComponents(MLEModel):
     component time series are available in the results class in the
     `level` and `trend` attributes, respectively.
 
-    **Seasonal (Time-domain)**
+    **Seasonal**
 
     The seasonal component is modeled as:
 
@@ -229,41 +202,6 @@ class UnobservedComponents(MLEModel):
 
     Following the fitting of the model, the unobserved seasonal component
     time series is available in the results class in the `seasonal`
-    attribute.
-
-    **Frequency-domain Seasonal**
-
-    Each frequency-domain seasonal component is modeled as:
-
-    .. math::
-
-        \gamma_t & =  \sum_{j=1}^h \gamma_{j, t} \\
-        \gamma_{j, t+1} & = \gamma_{j, t}\cos(\lambda_j)
-                        + \gamma^{*}_{j, t}\sin(\lambda_j) + \omega_{j,t} \\
-        \gamma^{*}_{j, t+1} & = -\gamma^{(1)}_{j, t}\sin(\lambda_j)
-                            + \gamma^{*}_{j, t}\cos(\lambda_j)
-                            + \omega^{*}_{j, t}, \\
-        \omega^{*}_{j, t}, \omega_{j, t} & \sim N(0, \sigma_{\omega^2}) \\
-        \lambda_j & = \frac{2 \pi j}{s}
-
-    where j ranges from 1 to h.
-
-    The periodicity (number of "seasons" in a "year") is s and the number of
-    harmonics is h.  Note that h is configurable to be less than s/2, but
-    s/2 harmonics is sufficient to fully model all seasonal variations of
-    periodicity s.  Like the time domain seasonal term (cf. Seasonal section,
-    above), the inclusion of the error terms allows for the seasonal effects to
-    vary over time.  The argument stochastic_freq_seasonal can be used to set
-    one or more of the seasonal components of this type to be non-random,
-    meaning they will not vary over time.
-
-    This component results in one parameter to be fitted using maximum
-    likelihood: :math:`\sigma_{\omega^2}`, and up to two parameters to be
-    chosen, the number of seasons s and optionally the number of harmonics
-    h, with :math:`1 \leq h \leq \lfloor s/2 \rfloor`.
-
-    After fitting the model, each unobserved seasonal component modeled in the
-    frequency domain is available in the results class in the `freq_seasonal`
     attribute.
 
     **Cycle**
@@ -356,21 +294,18 @@ class UnobservedComponents(MLEModel):
 
     References
     ----------
+
     .. [1] Durbin, James, and Siem Jan Koopman. 2012.
        Time Series Analysis by State Space Methods: Second Edition.
        Oxford University Press.
-    """  # noqa:E501
+    """
 
     def __init__(self, endog, level=False, trend=False, seasonal=None,
-                 freq_seasonal=None, cycle=False, autoregressive=None,
-                 exog=None, irregular=False,
-                 stochastic_level=False,
-                 stochastic_trend=False,
-                 stochastic_seasonal=True,
-                 stochastic_freq_seasonal=None,
-                 stochastic_cycle=False,
+                 cycle=False, autoregressive=None, exog=None, irregular=False,
+                 stochastic_level=False, stochastic_trend=False,
+                 stochastic_seasonal=True, stochastic_cycle=False,
                  damped_cycle=False, cycle_period_bounds=None,
-                 mle_regression=True, use_exact_diffuse=False,
+                 mle_regression=True,
                  **kwargs):
 
         # Model options
@@ -378,15 +313,6 @@ class UnobservedComponents(MLEModel):
         self.trend = trend
         self.seasonal_periods = seasonal if seasonal is not None else 0
         self.seasonal = self.seasonal_periods > 0
-        if freq_seasonal:
-            self.freq_seasonal_periods = [d['period'] for d in freq_seasonal]
-            self.freq_seasonal_harmonics = [d.get(
-                'harmonics', int(np.floor(d['period'] / 2))) for
-                d in freq_seasonal]
-        else:
-            self.freq_seasonal_periods = []
-            self.freq_seasonal_harmonics = []
-        self.freq_seasonal = any(x > 0 for x in self.freq_seasonal_periods)
         self.cycle = cycle
         self.ar_order = autoregressive if autoregressive is not None else 0
         self.autoregressive = self.ar_order > 0
@@ -395,21 +321,10 @@ class UnobservedComponents(MLEModel):
         self.stochastic_level = stochastic_level
         self.stochastic_trend = stochastic_trend
         self.stochastic_seasonal = stochastic_seasonal
-        if stochastic_freq_seasonal is None:
-            self.stochastic_freq_seasonal = [True] * len(
-                self.freq_seasonal_periods)
-        else:
-            if len(stochastic_freq_seasonal) != len(freq_seasonal):
-                raise ValueError(
-                    "Length of stochastic_freq_seasonal must equal length"
-                    " of freq_seasonal: {!r} vs {!r}".format(
-                        len(stochastic_freq_seasonal), len(freq_seasonal)))
-            self.stochastic_freq_seasonal = stochastic_freq_seasonal
         self.stochastic_cycle = stochastic_cycle
 
         self.damped_cycle = damped_cycle
         self.mle_regression = mle_regression
-        self.use_exact_diffuse = use_exact_diffuse
 
         # Check for string trend/level specification
         self.trend_specification = None
@@ -501,8 +416,6 @@ class UnobservedComponents(MLEModel):
                 (self.level and self.stochastic_level) or
                 (self.trend and self.stochastic_trend) or
                 (self.seasonal and self.stochastic_seasonal) or
-                (self.freq_seasonal and any(
-                    self.stochastic_freq_seasonal)) or
                 (self.cycle and self.stochastic_cycle) or
                 self.autoregressive):
             warn("Specified model does not contain a stochastic element;"
@@ -513,13 +426,6 @@ class UnobservedComponents(MLEModel):
             raise ValueError('Seasonal component must have a seasonal period'
                              ' of at least 2.')
 
-        if self.freq_seasonal:
-            for p in self.freq_seasonal_periods:
-                if p < 2:
-                    raise ValueError(
-                        'Frequency Domain seasonal component must have a '
-                        'seasonal period of at least 2.')
-
         # Create a bitmask holding the level/trend specification
         self.trend_mask = (
             self.irregular * 0x01 |
@@ -529,28 +435,34 @@ class UnobservedComponents(MLEModel):
             self.trend * self.stochastic_trend * 0x10
         )
 
-        # Create the trend specification, if it was not given
+        # Create the trend specification, if it wasn't given
         if self.trend_specification is None:
             # trend specification may be none, e.g. if the model is only
             # a stochastic cycle, etc.
             self.trend_specification = _mask_map.get(self.trend_mask, None)
 
         # Exogenous component
-        (self.k_exog, exog) = prepare_exog(exog)
+        self.k_exog = 0
+        if exog is not None:
+            exog_is_using_pandas = _is_using_pandas(exog, None)
+            if not exog_is_using_pandas:
+                exog = np.asarray(exog)
 
+            # Make sure we have 2-dimensional array
+            if exog.ndim < 2:
+                if not exog_is_using_pandas:
+                    exog = np.atleast_2d(exog).T
+                else:
+                    exog = pd.DataFrame(exog)
+
+            self.k_exog = exog.shape[1]
         self.regression = self.k_exog > 0
 
         # Model parameters
-        self._k_seasonal_states = (self.seasonal_periods - 1) * self.seasonal
-        self._k_freq_seas_states = (
-            sum(2 * h for h in self.freq_seasonal_harmonics)
-            * self.freq_seasonal)
-        self._k_cycle_states = self.cycle * 2
         k_states = (
             self.level + self.trend +
-            self._k_seasonal_states +
-            self._k_freq_seas_states +
-            self._k_cycle_states +
+            (self.seasonal_periods - 1) * self.seasonal +
+            self.cycle * 2 +
             self.ar_order +
             (not self.mle_regression) * self.k_exog
         )
@@ -558,24 +470,18 @@ class UnobservedComponents(MLEModel):
             self.stochastic_level * self.level +
             self.stochastic_trend * self.trend +
             self.stochastic_seasonal * self.seasonal +
-            ((sum(2 * h if self.stochastic_freq_seasonal[ix] else 0 for
-                  ix, h in enumerate(self.freq_seasonal_harmonics))) *
-             self.freq_seasonal) +
-            self.stochastic_cycle * (self._k_cycle_states) +
+            self.stochastic_cycle * (self.cycle * 2) +
             self.autoregressive
         )
 
-        # Handle non-default loglikelihood burn
-        self._loglikelihood_burn = kwargs.get('loglikelihood_burn', None)
-
         # We can still estimate the model with just the irregular component,
         # just need to have one state that does nothing.
-        self._unused_state = False
+        loglikelihood_burn = kwargs.get('loglikelihood_burn',
+                                        k_states - self.ar_order)
         if k_states == 0:
             if not self.irregular:
                 raise ValueError('Model has no components specified.')
             k_states = 1
-            self._unused_state = True
         if k_posdef == 0:
             k_posdef = 1
 
@@ -588,6 +494,9 @@ class UnobservedComponents(MLEModel):
         # Set as time-varying model if we have exog
         if self.k_exog > 0:
             self.ssm._time_invariant = False
+
+        # Initialize the model
+        self.ssm.loglikelihood_burn = loglikelihood_burn
 
         # Need to reset the MLE names (since when they were first set, `setup`
         # had not been run (and could not have been at that point))
@@ -612,36 +521,26 @@ class UnobservedComponents(MLEModel):
             2*np.pi / cycle_period_bounds[1], 2*np.pi / cycle_period_bounds[0]
         )
 
-        # Update _init_keys attached by super
-        self._init_keys += ['level', 'trend', 'seasonal', 'freq_seasonal',
-                            'cycle', 'autoregressive', 'irregular',
+        # update _init_keys attached by super
+        self._init_keys += ['level', 'trend', 'seasonal', 'cycle',
+                            'autoregressive', 'exog', 'irregular',
                             'stochastic_level', 'stochastic_trend',
-                            'stochastic_seasonal', 'stochastic_freq_seasonal',
-                            'stochastic_cycle',
+                            'stochastic_seasonal', 'stochastic_cycle',
                             'damped_cycle', 'cycle_period_bounds',
                             'mle_regression'] + list(kwargs.keys())
-
-        # Initialize the state
-        self.initialize_default()
+        # TODO: I think the kwargs or not attached, need to recover from ???
 
     def _get_init_kwds(self):
         # Get keywords based on model attributes
         kwds = super(UnobservedComponents, self)._get_init_kwds()
 
         # Modifications
-        if self.trend_specification is not None:
-            kwds['level'] = self.trend_specification
-
-            for attr in ['irregular', 'trend', 'stochastic_level',
-                         'stochastic_trend']:
-                kwds[attr] = False
-
         kwds['seasonal'] = self.seasonal_periods
-        kwds['freq_seasonal'] = [
-            {'period': p,
-             'harmonics': self.freq_seasonal_harmonics[ix]} for
-            ix, p in enumerate(self.freq_seasonal_periods)]
         kwds['autoregressive'] = self.ar_order
+
+        for key, value in kwds.items():
+            if value is None and hasattr(self.ssm, key):
+                kwds[key] = getattr(self.ssm, key)
 
         return kwds
 
@@ -650,11 +549,11 @@ class UnobservedComponents(MLEModel):
         Setup the structural time series representation
         """
         # Initialize the ordered sets of parameters
-        self.parameters = {}
-        self.parameters_obs_intercept = {}
-        self.parameters_obs_cov = {}
-        self.parameters_transition = {}
-        self.parameters_state_cov = {}
+        self.parameters = OrderedDict()
+        self.parameters_obs_intercept = OrderedDict()
+        self.parameters_obs_cov = OrderedDict()
+        self.parameters_transition = OrderedDict()
+        self.parameters_state_cov = OrderedDict()
 
         # Initialize the fixed components of the state space matrices,
         i = 0  # state offset
@@ -690,33 +589,6 @@ class UnobservedComponents(MLEModel):
                 self.parameters_state_cov['seasonal_var'] = 1
                 j += 1
             i += n
-        if self.freq_seasonal:
-            for ix, h in enumerate(self.freq_seasonal_harmonics):
-                # These are the \gamma_jt and \gamma^*_jt terms in D&K (3.8)
-                n = 2 * h
-                p = self.freq_seasonal_periods[ix]
-                lambda_p = 2 * np.pi / float(p)
-
-                t = 0  # frequency transition matrix offset
-                for block in range(1, h + 1):
-                    # ibid. eqn (3.7)
-                    self.ssm['design', 0, i+t] = 1.
-
-                    # ibid. eqn (3.8)
-                    cos_lambda_block = np.cos(lambda_p * block)
-                    sin_lambda_block = np.sin(lambda_p * block)
-                    trans = np.array([[cos_lambda_block, sin_lambda_block],
-                                      [-sin_lambda_block, cos_lambda_block]])
-                    trans_s = np.s_[i + t:i + t + 2]
-                    self.ssm['transition', trans_s, trans_s] = trans
-                    t += 2
-
-                if self.stochastic_freq_seasonal[ix]:
-                    self.ssm['selection', i:i + n, j:j + n] = np.eye(n)
-                    cov_key = 'freq_seasonal_var_{!r}'.format(ix)
-                    self.parameters_state_cov[cov_key] = 1
-                    j += n
-                i += n
         if self.cycle:
             self.ssm['design', 0, i] = 1.
             self.parameters_transition['cycle_freq'] = 1
@@ -772,71 +644,57 @@ class UnobservedComponents(MLEModel):
         idx = np.diag_indices(self.ssm.k_posdef)
         self._idx_state_cov = ('state_cov', idx[0], idx[1])
 
-        # Some of the variances may be tied together (repeated parameter usage)
-        # Use list() for compatibility with python 3.5
-        param_keys = list(self.parameters_state_cov.keys())
-        self._var_repetitions = np.ones(self.k_state_cov, dtype=int)
-        if self.freq_seasonal:
-            for ix, is_stochastic in enumerate(self.stochastic_freq_seasonal):
-                if is_stochastic:
-                    num_harmonics = self.freq_seasonal_harmonics[ix]
-                    repeat_times = 2 * num_harmonics
-                    cov_key = 'freq_seasonal_var_{!r}'.format(ix)
-                    cov_ix = param_keys.index(cov_key)
-                    self._var_repetitions[cov_ix] = repeat_times
+    def initialize_state(self):
+        # Initialize the AR component as stationary, the rest as approximately
+        # diffuse
+        initial_state = np.zeros(self.k_states)
+        initial_state_cov = (
+            np.eye(self.k_states, dtype=self.ssm.transition.dtype) *
+            self.ssm.initial_variance
+        )
 
-        if self.stochastic_cycle and self.cycle:
-            cov_ix = param_keys.index('cycle_var')
-            self._var_repetitions[cov_ix] = 2
-        self._repeat_any_var = any(self._var_repetitions > 1)
+        if self.autoregressive:
 
-    def initialize_default(self, approximate_diffuse_variance=None):
-        if approximate_diffuse_variance is None:
-            approximate_diffuse_variance = self.ssm.initial_variance
-        if self.use_exact_diffuse:
-            diffuse_type = 'diffuse'
-        else:
-            diffuse_type = 'approximate_diffuse'
+            start = (
+                self.level + self.trend +
+                (self.seasonal_periods - 1) * self.seasonal +
+                self.cycle * 2
+            )
+            end = start + self.ar_order
+            selection_stationary = self.ssm['selection', start:end, :, 0]
+            selected_state_cov_stationary = np.dot(
+                np.dot(selection_stationary, self.ssm['state_cov', :, :, 0]),
+                selection_stationary.T
+            )
+            try:
+                initial_state_cov_stationary = solve_discrete_lyapunov(
+                    self.ssm['transition', start:end, start:end, 0],
+                    selected_state_cov_stationary
+                )
+            except:
+                initial_state_cov_stationary = solve_discrete_lyapunov(
+                    self.ssm['transition', start:end, start:end, 0],
+                    selected_state_cov_stationary,
+                    method='direct'
+                )
 
-            # Set the loglikelihood burn parameter, if not given in constructor
-            if self._loglikelihood_burn is None:
-                k_diffuse_states = (
-                    self.k_states - int(self._unused_state) - self.ar_order)
-                self.loglikelihood_burn = k_diffuse_states
+            initial_state_cov[start:end, start:end] = (
+                initial_state_cov_stationary
+            )
 
-        init = Initialization(
-            self.k_states,
-            approximate_diffuse_variance=approximate_diffuse_variance)
+        self.ssm.initialize_known(initial_state, initial_state_cov)
 
-        if self._unused_state:
-            # If this flag is set, it means we have a model with just an
-            # irregular component and nothing else. The state is then
-            # irrelevant and we can't put it as diffuse, since then the filter
-            # will never leave the diffuse state.
-            init.set(0, 'known', constant=[0])
-        elif self.autoregressive:
-            offset = (self.level + self.trend +
-                      self._k_seasonal_states +
-                      self._k_freq_seas_states +
-                      self._k_cycle_states)
-            length = self.ar_order
-            init.set((0, offset), diffuse_type)
-            init.set((offset, offset + length), 'stationary')
-            init.set((offset + length, self.k_states), diffuse_type)
-        # If we do not have an autoregressive component, then everything has
-        # a diffuse initialization
-        else:
-            init.set(None, diffuse_type)
+    def filter(self, params, **kwargs):
+        kwargs.setdefault('results_class', UnobservedComponentsResults)
+        kwargs.setdefault('results_wrapper_class',
+                          UnobservedComponentsResultsWrapper)
+        return super(UnobservedComponents, self).filter(params, **kwargs)
 
-        self.ssm.initialization = init
-
-    def clone(self, endog, exog=None, **kwargs):
-        return self._clone_from_init_kwds(endog, exog=exog, **kwargs)
-
-    @property
-    def _res_classes(self):
-        return {'fit': (UnobservedComponentsResults,
-                        UnobservedComponentsResultsWrapper)}
+    def smooth(self, params, **kwargs):
+        kwargs.setdefault('results_class', UnobservedComponentsResults)
+        kwargs.setdefault('results_wrapper_class',
+                          UnobservedComponentsResultsWrapper)
+        return super(UnobservedComponents, self).smooth(params, **kwargs)
 
     @property
     def start_params(self):
@@ -893,16 +751,11 @@ class UnobservedComponents(MLEModel):
         if self.stochastic_seasonal:
             _start_params['seasonal_var'] = var_resid
 
-        # Frequency domain seasonal
-        for ix, is_stochastic in enumerate(self.stochastic_freq_seasonal):
-            cov_key = 'freq_seasonal_var_{!r}'.format(ix)
-            _start_params[cov_key] = var_resid
-
         # Cyclical
         if self.cycle:
             _start_params['cycle_var'] = var_resid
-            # Clip this to make sure it is positive and strictly stationary
-            # (i.e. do not want negative or 1)
+            # Clip this to make sure it is postive and strictly stationary
+            # (i.e. don't want negative or 1)
             _start_params['cycle_damp'] = np.clip(
                 np.linalg.pinv(resid[:-1, None]).dot(resid[1:])[0], 0, 0.99
             )
@@ -952,17 +805,6 @@ class UnobservedComponents(MLEModel):
                 param_names.append('sigma2.trend')
             elif key == 'seasonal_var':
                 param_names.append('sigma2.seasonal')
-            elif key.startswith('freq_seasonal_var_'):
-                # There are potentially multiple frequency domain
-                # seasonal terms
-                idx_fseas_comp = int(key[-1])
-                periodicity = self.freq_seasonal_periods[idx_fseas_comp]
-                harmonics = self.freq_seasonal_harmonics[idx_fseas_comp]
-                freq_seasonal_name = "{p}({h})".format(
-                    p=repr(periodicity),
-                    h=repr(harmonics))
-                param_names.append(
-                    'sigma2.' + 'freq_seasonal_' + freq_seasonal_name)
             elif key == 'cycle_var':
                 param_names.append('sigma2.cycle')
             elif key == 'cycle_freq':
@@ -982,33 +824,6 @@ class UnobservedComponents(MLEModel):
             else:
                 param_names.append(key)
         return param_names
-
-    @property
-    def state_names(self):
-        names = []
-        if self.level:
-            names.append('level')
-        if self.trend:
-            names.append('trend')
-        if self.seasonal:
-            names.append('seasonal')
-            names += ['seasonal.L%d' % i
-                      for i in range(1, self._k_seasonal_states)]
-        if self.freq_seasonal:
-            names += ['freq_seasonal.%d' % i
-                      for i in range(self._k_freq_seas_states)]
-        if self.cycle:
-            names += ['cycle', 'cycle.auxilliary']
-        if self.ar_order > 0:
-            names += ['ar.L%d' % i
-                      for i in range(1, self.ar_order + 1)]
-        if self.k_exog > 0 and not self.mle_regression:
-            names += ['beta.%s' % self.exog_names[i]
-                      for i in range(self.k_exog)]
-        if self._unused_state:
-            names += ['dummy']
-
-        return names
 
     def transform_params(self, unconstrained):
         """
@@ -1098,22 +913,8 @@ class UnobservedComponents(MLEModel):
 
         return unconstrained
 
-    def _validate_can_fix_params(self, param_names):
-        super(UnobservedComponents, self)._validate_can_fix_params(param_names)
-
-        if 'ar_coeff' in self.parameters:
-            ar_names = ['ar.L%d' % (i+1) for i in range(self.ar_order)]
-            fix_all_ar = param_names.issuperset(ar_names)
-            fix_any_ar = len(param_names.intersection(ar_names)) > 0
-            if fix_any_ar and not fix_all_ar:
-                raise ValueError('Cannot fix individual autoregressive.'
-                                 ' parameters. Must either fix all'
-                                 ' autoregressive parameters or none.')
-
-    def update(self, params, transformed=True, includes_fixed=False,
-               complex_step=False):
-        params = self.handle_params(params, transformed=transformed,
-                                    includes_fixed=includes_fixed)
+    def update(self, params, **kwargs):
+        params = super(UnobservedComponents, self).update(params, **kwargs)
 
         offset = 0
 
@@ -1125,8 +926,11 @@ class UnobservedComponents(MLEModel):
         # State covariance
         if self.k_state_cov > 0:
             variances = params[offset:offset+self.k_state_cov]
-            if self._repeat_any_var:
-                variances = np.repeat(variances, self._var_repetitions)
+            if self.stochastic_cycle and self.cycle:
+                if self.autoregressive:
+                    variances = np.r_[variances[:-1], variances[-2:]]
+                else:
+                    variances = np.r_[variances, variances[-1]]
             self.ssm[self._idx_state_cov] = variances
             offset += self.k_state_cov
 
@@ -1160,6 +964,9 @@ class UnobservedComponents(MLEModel):
                 )[None, :]
             offset += self.k_exog
 
+        # Initialize the state
+        self.initialize_state()
+
 
 class UnobservedComponentsResults(MLEResults):
     """
@@ -1182,7 +989,7 @@ class UnobservedComponentsResults(MLEResults):
     statsmodels.tsa.statespace.mlemodel.MLEResults
     """
 
-    def __init__(self, model, params, filter_results, cov_type=None,
+    def __init__(self, model, params, filter_results, cov_type='opg',
                  **kwargs):
         super(UnobservedComponentsResults, self).__init__(
             model, params, filter_results, cov_type, **kwargs)
@@ -1192,12 +999,6 @@ class UnobservedComponentsResults(MLEResults):
         # Save _init_kwds
         self._init_kwds = self.model._get_init_kwds()
 
-        # Save number of states by type
-        self._k_states_by_type = {
-            'seasonal': self.model._k_seasonal_states,
-            'freq_seasonal': self.model._k_freq_seas_states,
-            'cycle': self.model._k_cycle_states}
-
         # Save the model specification
         self.specification = Bunch(**{
             # Model options
@@ -1205,9 +1006,6 @@ class UnobservedComponentsResults(MLEResults):
             'trend': self.model.trend,
             'seasonal_periods': self.model.seasonal_periods,
             'seasonal': self.model.seasonal,
-            'freq_seasonal': self.model.freq_seasonal,
-            'freq_seasonal_periods': self.model.freq_seasonal_periods,
-            'freq_seasonal_harmonics': self.model.freq_seasonal_harmonics,
             'cycle': self.model.cycle,
             'ar_order': self.model.ar_order,
             'autoregressive': self.model.autoregressive,
@@ -1215,7 +1013,6 @@ class UnobservedComponentsResults(MLEResults):
             'stochastic_level': self.model.stochastic_level,
             'stochastic_trend': self.model.stochastic_trend,
             'stochastic_seasonal': self.model.stochastic_seasonal,
-            'stochastic_freq_seasonal': self.model.stochastic_freq_seasonal,
             'stochastic_cycle': self.model.stochastic_cycle,
 
             'damped_cycle': self.model.damped_cycle,
@@ -1340,81 +1137,6 @@ class UnobservedComponentsResults(MLEResults):
         return out
 
     @property
-    def freq_seasonal(self):
-        """
-        Estimates of unobserved frequency domain seasonal component(s)
-
-        Returns
-        -------
-        out: list of Bunch instances
-            Each item has the following attributes:
-
-            - `filtered`: a time series array with the filtered estimate of
-                          the component
-            - `filtered_cov`: a time series array with the filtered estimate of
-                          the variance/covariance of the component
-            - `smoothed`: a time series array with the smoothed estimate of
-                          the component
-            - `smoothed_cov`: a time series array with the smoothed estimate of
-                          the variance/covariance of the component
-            - `offset`: an integer giving the offset in the state vector where
-                        this component begins
-        """
-        # If present, freq_seasonal components always follows level/trend
-        #  and seasonal.
-
-        # There are 2 * (harmonics) seasonal states per freq_seasonal
-        # component.
-        # The sum of every other state enters the measurement equation.
-        # Additionally, there can be multiple components of this type.
-        # These facts make this property messier in implementation than the
-        # others.
-        # Fortunately, the states are conditionally mutually independent
-        # (conditional on previous timestep's states), so that the calculations
-        # of the variances are simple summations of individual variances and
-        # the calculation of the returned state is likewise a summation.
-        out = []
-        spec = self.specification
-        if spec.freq_seasonal:
-            previous_states_offset = int(spec.trend + spec.level
-                                         + self._k_states_by_type['seasonal'])
-            previous_f_seas_offset = 0
-            for ix, h in enumerate(spec.freq_seasonal_harmonics):
-                offset = previous_states_offset + previous_f_seas_offset
-
-                period = spec.freq_seasonal_periods[ix]
-
-                # Only the gamma_jt terms enter the measurement equation (cf.
-                # D&K 2012 (3.7))
-                states_in_sum = np.arange(0, 2 * h, 2)
-
-                filtered_state = np.sum(
-                    [self.filtered_state[offset + j] for j in states_in_sum],
-                    axis=0)
-                filtered_cov = np.sum(
-                    [self.filtered_state_cov[offset + j, offset + j] for j in
-                     states_in_sum], axis=0)
-
-                item = Bunch(
-                    filtered=filtered_state,
-                    filtered_cov=filtered_cov,
-                    smoothed=None, smoothed_cov=None,
-                    offset=offset,
-                    pretty_name='seasonal {p}({h})'.format(p=repr(period),
-                                                           h=repr(h)))
-                if self.smoothed_state is not None:
-                    item.smoothed = np.sum(
-                        [self.smoothed_state[offset+j] for j in states_in_sum],
-                        axis=0)
-                if self.smoothed_state_cov is not None:
-                    item.smoothed_cov = np.sum(
-                        [self.smoothed_state_cov[offset+j, offset+j]
-                         for j in states_in_sum], axis=0)
-                out.append(item)
-                previous_f_seas_offset += 2 * h
-        return out
-
-    @property
     def cycle(self):
         """
         Estimates of unobserved cycle component
@@ -1435,8 +1157,7 @@ class UnobservedComponentsResults(MLEResults):
             - `offset`: an integer giving the offset in the state vector where
                         this component begins
         """
-        # If present, cycle always follows level/trend, seasonal, and freq
-        #  seasonal.
+        # If present, cycle always follows level/trend and seasonal
         # Note that we return only the first cyclical state, but there are
         # in fact 2 cyclical states. The second cyclical state is not simply
         # a lag of the first cyclical state, but the first cyclical state is
@@ -1444,9 +1165,8 @@ class UnobservedComponentsResults(MLEResults):
         out = None
         spec = self.specification
         if spec.cycle:
-            offset = int(spec.trend + spec.level
-                         + self._k_states_by_type['seasonal']
-                         + self._k_states_by_type['freq_seasonal'])
+            offset = int(spec.trend + spec.level +
+                         spec.seasonal * (spec.seasonal_periods - 1))
             out = Bunch(filtered=self.filtered_state[offset],
                         filtered_cov=self.filtered_state_cov[offset, offset],
                         smoothed=None, smoothed_cov=None,
@@ -1478,17 +1198,15 @@ class UnobservedComponentsResults(MLEResults):
             - `offset`: an integer giving the offset in the state vector where
                         this component begins
         """
-        # If present, autoregressive always follows level/trend, seasonal,
-        # freq seasonal, and cyclical.
-        # If it is an AR(p) model, then there are p associated
+        # If present, autoregressive always follows level/trend, seasonal, and
+        # cyclical. If it is an AR(p) model, then there are p associated
         # states, but the second - pth states are just lags of the first state.
         out = None
         spec = self.specification
         if spec.autoregressive:
-            offset = int(spec.trend + spec.level
-                         + self._k_states_by_type['seasonal']
-                         + self._k_states_by_type['freq_seasonal']
-                         + self._k_states_by_type['cycle'])
+            offset = int(spec.trend + spec.level +
+                         spec.seasonal * (spec.seasonal_periods - 1) +
+                         2 * spec.cycle)
             out = Bunch(filtered=self.filtered_state[offset],
                         filtered_cov=self.filtered_state_cov[offset, offset],
                         smoothed=None, smoothed_cov=None,
@@ -1521,7 +1239,7 @@ class UnobservedComponentsResults(MLEResults):
                         this component begins
         """
         # If present, state-vector regression coefficients always are last
-        # (i.e. they follow level/trend, seasonal, freq seasonal, cyclical, and
+        # (i.e. they follow level/trend, seasonal, cyclical, and
         # autoregressive states). There is one state associated with each
         # regressor, and all are returned here.
         out = None
@@ -1534,11 +1252,10 @@ class UnobservedComponentsResults(MLEResults):
                               ' available in the parameters list, not as part'
                               ' of the state vector.', OutputWarning)
             else:
-                offset = int(spec.trend + spec.level
-                             + self._k_states_by_type['seasonal']
-                             + self._k_states_by_type['freq_seasonal']
-                             + self._k_states_by_type['cycle']
-                             + spec.ar_order)
+                offset = int(spec.trend + spec.level +
+                             spec.seasonal * (spec.seasonal_periods - 1) +
+                             spec.cycle * (1 + spec.stochastic_cycle) +
+                             spec.ar_order)
                 start = offset
                 end = offset + spec.k_exog
                 out = Bunch(
@@ -1556,8 +1273,7 @@ class UnobservedComponentsResults(MLEResults):
 
     def plot_components(self, which=None, alpha=0.05,
                         observed=True, level=True, trend=True,
-                        seasonal=True, freq_seasonal=True,
-                        cycle=True, autoregressive=True,
+                        seasonal=True, cycle=True, autoregressive=True,
                         legend_loc='upper right', fig=None, figsize=None):
         """
         Plot the estimated components of the model.
@@ -1569,29 +1285,22 @@ class UnobservedComponentsResults(MLEResults):
             results are available otherwise 'filtered'.
         alpha : float, optional
             The confidence intervals for the components are (1 - alpha) %
-        observed : bool, optional
-            Whether or not to plot the observed series against
-            one-step-ahead predictions.
-            Default is True.
-        level : bool, optional
+        level : boolean, optional
             Whether or not to plot the level component, if applicable.
             Default is True.
-        trend : bool, optional
+        trend : boolean, optional
             Whether or not to plot the trend component, if applicable.
             Default is True.
-        seasonal : bool, optional
+        seasonal : boolean, optional
             Whether or not to plot the seasonal component, if applicable.
             Default is True.
-        freq_seasonal : bool, optional
-            Whether or not to plot the frequency domain seasonal component(s),
-            if applicable. Default is True.
-        cycle : bool, optional
+        cycle : boolean, optional
             Whether or not to plot the cyclical component, if applicable.
             Default is True.
-        autoregressive : bool, optional
+        autoregressive : boolean, optional
             Whether or not to plot the autoregressive state, if applicable.
             Default is True.
-        fig : Figure, optional
+        fig : Matplotlib Figure instance, optional
             If given, subplots are created in this figure instead of in a new
             figure. Note that the grid will be created in the provided
             figure using `fig.add_subplot()`.
@@ -1608,12 +1317,11 @@ class UnobservedComponentsResults(MLEResults):
         1. Level
         2. Trend
         3. Seasonal
-        4. Freq Seasonal
-        5. Cycle
-        6. Autoregressive
+        4. Cycle
+        5. Autoregressive
 
         Specific subplots will be removed if the component is not present in
-        the estimated model or if the corresponding keyword argument is set to
+        the estimated model or if the corresponding keywork argument is set to
         False.
 
         All plots contain (1 - `alpha`) %  confidence intervals.
@@ -1629,23 +1337,13 @@ class UnobservedComponentsResults(MLEResults):
 
         # Determine which plots we have
         spec = self.specification
-
-        comp = [
+        components = OrderedDict([
             ('level', level and spec.level),
             ('trend', trend and spec.trend),
             ('seasonal', seasonal and spec.seasonal),
-        ]
-
-        if freq_seasonal and spec.freq_seasonal:
-            for ix, _ in enumerate(spec.freq_seasonal_periods):
-                key = 'freq_seasonal_{!r}'.format(ix)
-                comp.append((key, True))
-
-        comp.extend(
-            [('cycle', cycle and spec.cycle),
-             ('autoregressive', autoregressive and spec.autoregressive)])
-
-        components = dict(comp)
+            ('cycle', cycle and spec.cycle),
+            ('autoregressive', autoregressive and spec.autoregressive),
+        ])
 
         llb = self.filter_results.loglikelihood_burn
 
@@ -1687,7 +1385,7 @@ class UnobservedComponentsResults(MLEResults):
             ci_label = '$%.3g \\%%$ confidence interval' % ((1 - alpha) * 100)
 
             # Proxy artist for fill_between legend entry
-            # See e.g. https://matplotlib.org/1.3.1/users/legend_guide.html
+            # See e.g. http://matplotlib.org/1.3.1/users/legend_guide.html
             p = plt.Rectangle((0, 0), 1, 1, fc=ci_poly.get_facecolor()[0])
 
             # Legend
@@ -1706,19 +1404,7 @@ class UnobservedComponentsResults(MLEResults):
             ax = fig.add_subplot(k_plots, 1, plot_idx)
             plot_idx += 1
 
-            try:
-                component_bunch = getattr(self, component)
-                title = component.title()
-            except AttributeError:
-                # This might be a freq_seasonal component, of which there are
-                #  possibly multiple bagged up in property freq_seasonal
-                if component.startswith('freq_seasonal_'):
-                    ix = int(component.replace('freq_seasonal_', ''))
-                    big_bunch = getattr(self, 'freq_seasonal')
-                    component_bunch = big_bunch[ix]
-                    title = component_bunch.pretty_name
-                else:
-                    raise
+            component_bunch = getattr(self, component)
 
             # Check for a valid estimation type
             if which not in component_bunch:
@@ -1730,7 +1416,7 @@ class UnobservedComponentsResults(MLEResults):
             value = component_bunch[which]
 
             # Plot
-            state_label = '%s (%s)' % (title, which)
+            state_label = '%s (%s)' % (component.title(), which)
             ax.plot(dates[llb:], value[llb:], label=state_label)
 
             # Get confidence intervals
@@ -1742,12 +1428,12 @@ class UnobservedComponentsResults(MLEResults):
                     dates[llb:], ci_lower[llb:], ci_upper[llb:], alpha=0.2
                 )
                 ci_label = ('$%.3g \\%%$ confidence interval'
-                            % ((1 - alpha) * 100))
+                            % ((1 - alpha)*100))
 
             # Legend
             ax.legend(loc=legend_loc)
 
-            ax.set_title('%s component' % title)
+            ax.set_title('%s component' % component.title())
 
         # Add a note if first observations excluded
         if llb > 0:
@@ -1757,7 +1443,102 @@ class UnobservedComponentsResults(MLEResults):
 
         return fig
 
-    @Appender(MLEResults.summary.__doc__)
+    def get_prediction(self, start=None, end=None, dynamic=False, index=None,
+                       exog=None, **kwargs):
+        """
+        In-sample prediction and out-of-sample forecasting
+
+        Parameters
+        ----------
+        start : int, str, or datetime, optional
+            Zero-indexed observation number at which to start forecasting, ie.,
+            the first forecast is start. Can also be a date string to
+            parse or a datetime type. Default is the the zeroth observation.
+        end : int, str, or datetime, optional
+            Zero-indexed observation number at which to end forecasting, ie.,
+            the first forecast is start. Can also be a date string to
+            parse or a datetime type. However, if the dates index does not
+            have a fixed frequency, end must be an integer index if you
+            want out of sample prediction. Default is the last observation in
+            the sample.
+        exog : array_like, optional
+            If the model includes exogenous regressors, you must provide
+            exactly enough out-of-sample values for the exogenous variables if
+            end is beyond the last observation in the sample.
+        dynamic : boolean, int, str, or datetime, optional
+            Integer offset relative to `start` at which to begin dynamic
+            prediction. Can also be an absolute date string to parse or a
+            datetime type (these are not interpreted as offsets).
+            Prior to this observation, true endogenous values will be used for
+            prediction; starting with this observation and continuing through
+            the end of prediction, forecasted endogenous values will be used
+            instead.
+        full_results : boolean, optional
+            If True, returns a FilterResults instance; if False returns a
+            tuple with forecasts, the forecast errors, and the forecast error
+            covariance matrices. Default is False.
+        **kwargs
+            Additional arguments may required for forecasting beyond the end
+            of the sample. See `FilterResults.predict` for more details.
+
+        Returns
+        -------
+        forecast : array
+            Array of out of sample forecasts.
+        """
+        if start is None:
+            start = self.model._index[0]
+
+        # Handle end (e.g. date)
+        _start, _end, _out_of_sample, prediction_index = (
+            self.model._get_prediction_index(start, end, index, silent=True))
+
+        # Handle exogenous parameters
+        if _out_of_sample and self.model.k_exog > 0:
+            # Create a new faux model for the extended dataset
+            nobs = self.model.data.orig_endog.shape[0] + _out_of_sample
+            endog = np.zeros((nobs, self.model.k_endog))
+
+            if self.model.k_exog > 0:
+                if exog is None:
+                    raise ValueError('Out-of-sample forecasting in a model'
+                                     ' with a regression component requires'
+                                     ' additional exogenous values via the'
+                                     ' `exog` argument.')
+                exog = np.array(exog)
+                required_exog_shape = (_out_of_sample, self.model.k_exog)
+                if not exog.shape == required_exog_shape:
+                    raise ValueError('Provided exogenous values are not of the'
+                                     ' appropriate shape. Required %s, got %s.'
+                                     % (str(required_exog_shape),
+                                        str(exog.shape)))
+                exog = np.c_[self.model.data.orig_exog.T, exog.T].T
+
+            model_kwargs = self._init_kwds.copy()
+            model_kwargs['exog'] = exog
+            model = UnobservedComponents(endog, **model_kwargs)
+            model.update(self.params)
+
+            # Set the kwargs with the update time-varying state space
+            # representation matrices
+            for name in self.filter_results.shapes.keys():
+                if name == 'obs':
+                    continue
+                mat = getattr(model.ssm, name)
+                if mat.shape[-1] > 1:
+                    if len(mat.shape) == 2:
+                        kwargs[name] = mat[:, -_out_of_sample:]
+                    else:
+                        kwargs[name] = mat[:, :, -_out_of_sample:]
+        elif self.model.k_exog == 0 and exog is not None:
+            # TODO: UserWarning
+            warn('Exogenous array provided to predict, but additional data not'
+                 ' required. `exog` argument ignored.', ValueWarning)
+
+        return super(UnobservedComponentsResults, self).get_prediction(
+            start=start, end=end, dynamic=dynamic, index=index, exog=exog,
+            **kwargs)
+
     def summary(self, alpha=.05, start=None):
         # Create the model name
 
@@ -1769,18 +1550,6 @@ class UnobservedComponentsResults(MLEResults):
             if self.specification.stochastic_seasonal:
                 seasonal_name = 'stochastic ' + seasonal_name
             model_name.append(seasonal_name)
-
-        if self.specification.freq_seasonal:
-            for ix, is_stochastic in enumerate(
-                    self.specification.stochastic_freq_seasonal):
-                periodicity = self.specification.freq_seasonal_periods[ix]
-                harmonics = self.specification.freq_seasonal_harmonics[ix]
-                freq_seasonal_name = "freq_seasonal({p}({h}))".format(
-                    p=repr(periodicity),
-                    h=repr(harmonics))
-                if is_stochastic:
-                    freq_seasonal_name = 'stochastic ' + freq_seasonal_name
-                model_name.append(freq_seasonal_name)
 
         if self.specification.cycle:
             cycle_name = 'cycle'
@@ -1798,6 +1567,7 @@ class UnobservedComponentsResults(MLEResults):
             alpha=alpha, start=start, title='Unobserved Components Results',
             model_name=model_name
         )
+    summary.__doc__ = MLEResults.summary.__doc__
 
 
 class UnobservedComponentsResultsWrapper(MLEResultsWrapper):
@@ -1807,5 +1577,5 @@ class UnobservedComponentsResultsWrapper(MLEResultsWrapper):
     _methods = {}
     _wrap_methods = wrap.union_dicts(MLEResultsWrapper._wrap_methods,
                                      _methods)
-wrap.populate_wrapper(UnobservedComponentsResultsWrapper,  # noqa:E305
+wrap.populate_wrapper(UnobservedComponentsResultsWrapper,
                       UnobservedComponentsResults)

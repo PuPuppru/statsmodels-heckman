@@ -18,8 +18,8 @@ License: BSD-3
 References
 ----------
 Wikipedia: kappa's initially based on these two pages
-    https://en.wikipedia.org/wiki/Fleiss%27_kappa
-    https://en.wikipedia.org/wiki/Cohen's_kappa
+    http://en.wikipedia.org/wiki/Fleiss%27_kappa
+    http://en.wikipedia.org/wiki/Cohen's_kappa
 SAS-Manual : formulas for cohens_kappa, especially variances
 see also R package irr
 
@@ -35,6 +35,7 @@ convenience functions to create required data format from raw data
 
 """
 
+
 import numpy as np
 from scipy import stats  #get rid of this? need only norm.sf
 
@@ -45,7 +46,7 @@ class ResultsBunch(dict):
 
     def __init__(self, **kwds):
         dict.__init__(self, kwds)
-        self.__dict__ = self
+        self.__dict__  = self
         self._initialize()
 
     def _initialize(self):
@@ -191,58 +192,27 @@ def to_table(data, bins=None):
 
     return tt[0], bins_
 
-def fleiss_kappa(table, method='fleiss'):
-    """Fleiss' and Randolph's kappa multi-rater agreement measure
+def fleiss_kappa(table):
+    '''Fleiss' kappa multi-rater agreement measure
 
     Parameters
     ----------
     table : array_like, 2-D
-        assumes subjects in rows, and categories in columns. Convert raw data
-        into this format by using
-        :func:`statsmodels.stats.inter_rater.aggregate_raters`
-    method : str
-        Method 'fleiss' returns Fleiss' kappa which uses the sample margin
-        to define the chance outcome.
-        Method 'randolph' or 'uniform' (only first 4 letters are needed)
-        returns Randolph's (2005) multirater kappa which assumes a uniform
-        distribution of the categories to define the chance outcome.
+        assumes subjects in rows, and categories in columns
 
     Returns
     -------
     kappa : float
-        Fleiss's or Randolph's kappa statistic for inter rater agreement
+        Fleiss's kappa statistic for inter rater agreement
 
     Notes
     -----
-    no variance or hypothesis tests yet
+    coded from Wikipedia page
+    http://en.wikipedia.org/wiki/Fleiss%27_kappa
 
-    Interrater agreement measures like Fleiss's kappa measure agreement relative
-    to chance agreement. Different authors have proposed ways of defining
-    these chance agreements. Fleiss' is based on the marginal sample distribution
-    of categories, while Randolph uses a uniform distribution of categories as
-    benchmark. Warrens (2010) showed that Randolph's kappa is always larger or
-    equal to Fleiss' kappa. Under some commonly observed condition, Fleiss' and
-    Randolph's kappa provide lower and upper bounds for two similar kappa_like
-    measures by Light (1971) and Hubert (1977).
+    no variance or tests yet
 
-    References
-    ----------
-    Wikipedia https://en.wikipedia.org/wiki/Fleiss%27_kappa
-
-    Fleiss, Joseph L. 1971. "Measuring Nominal Scale Agreement among Many
-    Raters." Psychological Bulletin 76 (5): 378-82.
-    https://doi.org/10.1037/h0031619.
-
-    Randolph, Justus J. 2005 "Free-Marginal Multirater Kappa (multirater
-    K [free]): An Alternative to Fleiss' Fixed-Marginal Multirater Kappa."
-    Presented at the Joensuu Learning and Instruction Symposium, vol. 2005
-    https://eric.ed.gov/?id=ED490661
-
-    Warrens, Matthijs J. 2010. "Inequalities between Multi-Rater Kappas."
-    Advances in Data Analysis and Classification 4 (4): 271-86.
-    https://doi.org/10.1007/s11634-010-0073-4.
-    """
-
+    '''
     table = 1.0 * np.asarray(table)   #avoid integer division
     n_sub, n_cat =  table.shape
     n_total = table.sum()
@@ -258,10 +228,7 @@ def fleiss_kappa(table, method='fleiss'):
     p_rat = (table2.sum(1) - n_rat) / (n_rat * (n_rat - 1.))
     p_mean = p_rat.mean()
 
-    if method == 'fleiss':
-        p_mean_exp = (p_cat*p_cat).sum()
-    elif method.startswith('rand') or method.startswith('unif'):
-        p_mean_exp = 1 / n_cat
+    p_mean_exp = (p_cat*p_cat).sum()
 
     kappa = (p_mean - p_mean_exp) / (1- p_mean_exp)
     return kappa
@@ -283,7 +250,7 @@ def cohens_kappa(table, weights=None, return_results=True, wt=None):
         matrix. For computing the variance of kappa, the maximum of the
         weights is assumed to be smaller or equal to one.
         TODO: fix conflicting definitions in the 2-Dim case for
-    wt : {None, str}
+    wt : None or string
         If wt and weights are None, then the simple kappa is computed.
         If wt is given, but weights is None, then the weights are set to
         be [0, 1, 2, ..., k].
@@ -328,7 +295,7 @@ def cohens_kappa(table, weights=None, return_results=True, wt=None):
 
     weights = '0, 0, 1, 1' and wt = 'linear' means that the first two levels
     are zero distance apart and the same for the last two levels. This is
-    the sample as forming two aggregated levels by merging the first two and
+    the sampe as forming two aggregated levels by merging the first two and
     the last two levels, respectively.
 
     weights = [0, 1, 2, 3] and wt = 'quadratic' is the same as squaring these
@@ -427,7 +394,8 @@ def cohens_kappa(table, weights=None, return_results=True, wt=None):
                     kappa_max=kappa_max,
                     weights=weights,
                     var_kappa=var_kappa,
-                    var_kappa0=var_kappa0)
+                    var_kappa0=var_kappa0
+                    )
         return res
     else:
         return kappa
@@ -494,7 +462,7 @@ class KappaResults(ResultsBunch):
     template = _kappa_template
 
     def _initialize(self):
-        if 'alpha' not in self:
+        if not 'alpha' in self:
             self['alpha'] = 0.025
             self['alpha_ci'] = _int_ifclose(100 - 0.025 * 200)[1]
 
@@ -516,3 +484,4 @@ class KappaResults(ResultsBunch):
 
     def __str__(self):
         return self.template % self
+

@@ -33,6 +33,7 @@ strongly rejected because differences in intercept are very large
 
 '''
 
+from __future__ import print_function
 import numpy as np
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
@@ -95,3 +96,7 @@ R = [[0, 1, 0, 0],
 # i.e. coefficient on both dummy variables equal zero
 print("Test hypothesis that all groups have same intercept")
 print(res2.f_test(R))
+
+
+
+

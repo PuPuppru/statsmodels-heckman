@@ -7,13 +7,12 @@ Author: Josef Perktold
 
 The example is loaded from a test module. The test still fails but the
 results look relatively good.
-I do not know yet why there is the small difference and why GAM does not
+I don't know yet why there is the small difference and why GAM doesn't
 converge in this case
 
 """
 
 
-import matplotlib.pyplot as plt
 
 from statsmodels.sandbox.tests.test_gam import _estGAMGaussianLogLink
 
@@ -38,6 +37,7 @@ comp2_true -= mean2
 noise = tt.res2.model.endog - tt.mu_true
 noise_eta =  tt.family.link(tt.res2.model.endog) - tt.y_true
 
+import matplotlib.pyplot as plt
 plt.figure()
 plt.plot(noise, 'k.')
 plt.figure()
@@ -46,7 +46,7 @@ plt.plot(comp1, 'b-')
 plt.plot(comp2, 'b-')
 plt.plot(comp1_true, 'k--', lw=2)
 plt.plot(comp2_true, 'k--', lw=2)
-#the next does not make sense - non-linear
+#the next doesn't make sense - non-linear
 #c1 = tt.family.link(tt.family.link.inverse(comp1_true) + noise)
 #c2 = tt.family.link(tt.family.link.inverse(comp2_true) + noise)
 #not nice in example/plot: noise variance is constant not proportional
@@ -56,3 +56,4 @@ plt.plot(comp2_true + noise_eta, 'r.', alpha=0.95)
 #plt.plot(c2, 'r.', alpha=0.95)
 plt.title('Gaussian loglink, GAM (red), GLM (blue), true (black)')
 plt.show()
+

@@ -5,19 +5,17 @@ Created on Mon May 27 12:07:02 2013
 
 Author: Josef Perktold
 """
-import warnings
 
 import numpy as np
-from numpy.testing import assert_almost_equal, assert_allclose
 import scipy.sparse as sparse
-import pytest
-
+from numpy.testing import (assert_almost_equal, assert_allclose,
+                           assert_equal)
 from statsmodels.stats.correlation_tools import (
     corr_nearest, corr_clipped, cov_nearest,
     _project_correlation_factors, corr_nearest_factor, _spg_optim,
     corr_thresholded, cov_nearest_factor_homog, FactoredPSDMatrix)
-from statsmodels.tools.testing import Holder
 
+import warnings
 
 def norm_f(x, y):
     '''Frobenious norm (squared sum) of difference between two arrays
@@ -25,6 +23,8 @@ def norm_f(x, y):
     d = ((x - y)**2).sum()
     return np.sqrt(d)
 
+class Holder(object):
+    pass
 
 # R library Matrix results
 cov1_r = Holder()
@@ -83,7 +83,6 @@ cov_r.mat = np.array([
      0.7445177382760834, 0.7766852947049376, 0.8107916469252828, 1.01
     ]).reshape(6,6, order='F')
 
-
 def test_corr_psd():
     # test positive definite matrix is unchanged
     x = np.array([[1, -0.2, -0.9], [-0.2, 1, -0.2], [-0.9, -0.2, 1]])
@@ -103,7 +102,7 @@ def test_corr_psd():
     assert_almost_equal(x2, y, decimal=14)
 
 
-class CheckCorrPSDMixin:
+class CheckCorrPSDMixin(object):
 
     def test_nearest(self):
         x = self.x
@@ -118,6 +117,7 @@ class CheckCorrPSDMixin:
         assert_allclose(evals, res_r.eigenvalues[::-1], rtol=0.003, atol=1e-7)
         #print evals[0] / 1e-7 - 1
         assert_allclose(evals[0], 1e-7, rtol=1e-6)
+
 
     def test_clipped(self):
         x = self.x
@@ -144,7 +144,7 @@ class CheckCorrPSDMixin:
         assert_allclose(d, res_r.normF, rtol=0.0015)
 
 
-class TestCovPSD:
+class TestCovPSD(object):
 
     @classmethod
     def setup_class(cls):
@@ -186,29 +186,36 @@ class TestCorrPSD1(CheckCorrPSDMixin):
         cls.x = x
         cls.res = cov1_r
 
-
-@pytest.mark.parametrize('threshold', [0, 1e-15, 1e-10, 1e-6])
-def test_corrpsd_threshold(threshold):
+def test_corrpsd_threshold():
     x = np.array([[1, -0.9, -0.9], [-0.9, 1, -0.9], [-0.9, -0.9, 1]])
 
-    y = corr_nearest(x, n_fact=100, threshold=threshold)
-    evals = np.linalg.eigvalsh(y)
-    assert_allclose(evals[0], threshold, rtol=1e-6, atol=1e-15)
+    #print np.linalg.eigvalsh(x)
+    for threshold in [0, 1e-15, 1e-10, 1e-6]:
 
-    y = corr_clipped(x, threshold=threshold)
-    evals = np.linalg.eigvalsh(y)
-    assert_allclose(evals[0], threshold, rtol=0.25, atol=1e-15)
+        y = corr_nearest(x, n_fact=100, threshold=threshold)
+        evals = np.linalg.eigvalsh(y)
+        #print 'evals', evals, threshold
+        assert_allclose(evals[0], threshold, rtol=1e-6, atol=1e-15)
 
-    y = cov_nearest(x, method='nearest', n_fact=100, threshold=threshold)
-    evals = np.linalg.eigvalsh(y)
-    assert_allclose(evals[0], threshold, rtol=1e-6, atol=1e-15)
+        y = corr_clipped(x, threshold=threshold)
+        evals = np.linalg.eigvalsh(y)
+        #print 'evals', evals, threshold
+        assert_allclose(evals[0], threshold, rtol=0.25, atol=1e-15)
 
-    y = cov_nearest(x, n_fact=100, threshold=threshold)
-    evals = np.linalg.eigvalsh(y)
-    assert_allclose(evals[0], threshold, rtol=0.25, atol=1e-15)
+        y = cov_nearest(x, method='nearest', n_fact=100, threshold=threshold)
+        evals = np.linalg.eigvalsh(y)
+        #print 'evals', evals, threshold
+        #print evals[0] / threshold - 1
+        assert_allclose(evals[0], threshold, rtol=1e-6, atol=1e-15)
 
+        y = cov_nearest(x, n_fact=100, threshold=threshold)
+        evals = np.linalg.eigvalsh(y)
+        #print 'evals', evals, threshold
+        #print evals[0] / threshold - 1
+        assert_allclose(evals[0], threshold, rtol=0.25, atol=1e-15)
 
-class Test_Factor:
+class Test_Factor(object):
+
 
     def test_corr_nearest_factor_arrpack(self):
 
@@ -272,73 +279,77 @@ class Test_Factor:
         assert_allclose(u, dsign * u2, rtol=1e-6, atol=1e-14)
         assert_allclose(s, s2, rtol=1e-6)
 
-    @pytest.mark.parametrize('dm', [1, 2])
-    def test_corr_nearest_factor(self, dm):
+
+    def test_corr_nearest_factor(self):
 
         objvals = [np.array([6241.8, 6241.8, 579.4, 264.6, 264.3]),
                    np.array([2104.9, 2104.9, 710.5, 266.3, 286.1])]
 
         d = 100
 
-        # Construct a test matrix with exact factor structure
-        X = np.zeros((d, dm), dtype=np.float64)
-        x = np.linspace(0, 2 * np.pi, d)
-        np.random.seed(10)
-        for j in range(dm):
-            X[:, j] = np.sin(x * (j + 1)) + 1e-10 * np.random.randn(d)
+        for dm in 1,2:
 
-        _project_correlation_factors(X)
-        assert np.isfinite(X).all()
-        X *= 0.7
-        mat = np.dot(X, X.T)
-        np.fill_diagonal(mat, 1.)
+            # Construct a test matrix with exact factor structure
+            X = np.zeros((d,dm), dtype=np.float64)
+            x = np.linspace(0, 2*np.pi, d)
+            np.random.seed(10)
+            for j in range(dm):
+                X[:,j] = np.sin(x*(j+1)) + 1e-10 * np.random.randn(d)
 
-        # Try to recover the structure
-        rslt = corr_nearest_factor(mat, dm, maxiter=10000)
-        err_msg = 'rank=%d, niter=%d' % (dm, len(rslt.objective_values))
-        assert_allclose(rslt.objective_values[:5], objvals[dm - 1],
-                        rtol=0.5, err_msg=err_msg)
-        assert rslt.Converged
+            _project_correlation_factors(X)
+            assert np.isfinite(X).all()
+            X *= 0.7
+            mat = np.dot(X, X.T)
+            np.fill_diagonal(mat, 1.)
 
-        mat1 = rslt.corr.to_matrix()
-        assert_allclose(mat, mat1, rtol=0.25, atol=1e-3, err_msg=err_msg)
+            # Try to recover the structure
+            rslt = corr_nearest_factor(mat, dm)
+            err_msg = 'rank=%d, niter=%d' % (dm, len(rslt.objective_values))
+            assert_allclose(rslt.objective_values[:5], objvals[dm - 1],
+                            rtol=0.5, err_msg=err_msg)
+            assert_equal(rslt.Converged, True, err_msg=err_msg)
+            mat1 = rslt.corr.to_matrix()
+            assert_allclose(mat, mat1, rtol=0.25, atol=1e-3, err_msg=err_msg)
 
-    @pytest.mark.slow
-    @pytest.mark.parametrize('dm', [1, 2])
-    def test_corr_nearest_factor_sparse(self, dm):
-        # Test that result is the same if the input is dense or sparse
-        d = 200
 
-        # Generate a test matrix of factors
-        X = np.zeros((d, dm), dtype=np.float64)
-        x = np.linspace(0, 2 * np.pi, d)
-        rs = np.random.RandomState(10)
-        for j in range(dm):
-            X[:, j] = np.sin(x * (j + 1)) + rs.randn(d)
+    # Test that we get the same result if the input is dense or sparse
+    def test_corr_nearest_factor_sparse(self):
 
-        # Get the correlation matrix
-        _project_correlation_factors(X)
-        X *= 0.7
-        mat = np.dot(X, X.T)
-        np.fill_diagonal(mat, 1)
+        d = 100
 
-        # Threshold it
-        mat.flat[np.abs(mat.flat) < 0.35] = 0.0
-        smat = sparse.csr_matrix(mat)
+        for dm in 1,2:
 
-        dense_rslt = corr_nearest_factor(mat, dm, maxiter=10000)
-        sparse_rslt = corr_nearest_factor(smat, dm, maxiter=10000)
+            # Generate a test matrix of factors
+            X = np.zeros((d,dm), dtype=np.float64)
+            x = np.linspace(0, 2*np.pi, d)
+            np.random.seed(10)
+            for j in range(dm):
+                X[:,j] = np.sin(x*(j+1)) + 1e-10 * np.random.randn(d)
 
-        mat_dense = dense_rslt.corr.to_matrix()
-        mat_sparse = sparse_rslt.corr.to_matrix()
+            # Get the correlation matrix
+            _project_correlation_factors(X)
+            X *= 0.7
+            mat = np.dot(X, X.T)
+            np.fill_diagonal(mat, 1)
 
-        assert dense_rslt.Converged is sparse_rslt.Converged
-        assert dense_rslt.Converged is True
+            # Threshold it
+            mat *= (np.abs(mat) >= 0.4)
+            smat = sparse.csr_matrix(mat)
 
-        assert_allclose(mat_dense, mat_sparse, rtol=.25, atol=1e-3)
+            rslt = corr_nearest_factor(smat, dm)
+            assert_equal(rslt.Converged, True)
+            mat_dense = rslt.corr.to_matrix()
+
+            rslt = corr_nearest_factor(smat, dm)
+            assert_equal(rslt.Converged, True)
+            mat_sparse = rslt.corr.to_matrix()
+
+            assert_allclose(mat_dense, mat_sparse, rtol=0.25,
+                            atol=1e-3)
+
 
     # Test on a quadratic function.
-    def test_spg_optim(self, reset_randomstate):
+    def test_spg_optim(self):
 
         dm = 100
 
@@ -358,10 +369,10 @@ class Test_Factor:
         x = np.random.normal(size=dm)
         rslt = _spg_optim(obj, grad, x, project)
         xnew = rslt.params
-        assert rslt.Converged is True
+        assert_equal(rslt.Converged, True)
         assert_almost_equal(obj(xnew), 0, decimal=3)
 
-    def test_decorrelate(self, reset_randomstate):
+    def test_decorrelate(self):
 
         d = 30
         dg = np.linspace(1, 2, d)
@@ -379,7 +390,7 @@ class Test_Factor:
         mat3 = np.dot(mat3.T, mat3)
         assert_almost_equal(mat2, mat3)
 
-    def test_logdet(self, reset_randomstate):
+    def test_logdet(self):
 
         d = 30
         dg = np.linspace(1, 2, d)
@@ -392,7 +403,7 @@ class Test_Factor:
 
         assert_almost_equal(ld, ld2)
 
-    def test_solve(self, reset_randomstate):
+    def test_solve(self):
 
         d = 30
         dg = np.linspace(1, 2, d)
@@ -404,51 +415,54 @@ class Test_Factor:
         sr2 = np.linalg.solve(mat, rhs)
         assert_almost_equal(sr1, sr2)
 
-    @pytest.mark.parametrize('dm', [1, 2])
-    def test_cov_nearest_factor_homog(self, dm):
+    def test_cov_nearest_factor_homog(self):
 
         d = 100
 
-        # Construct a test matrix with exact factor structure
-        X = np.zeros((d, dm), dtype=np.float64)
-        x = np.linspace(0, 2*np.pi, d)
-        for j in range(dm):
-            X[:, j] = np.sin(x*(j+1))
-        mat = np.dot(X, X.T)
-        np.fill_diagonal(mat, np.diag(mat) + 3.1)
+        for dm in 1,2:
 
-        # Try to recover the structure
-        rslt = cov_nearest_factor_homog(mat, dm)
-        mat1 = rslt.to_matrix()
+            # Construct a test matrix with exact factor structure
+            X = np.zeros((d,dm), dtype=np.float64)
+            x = np.linspace(0, 2*np.pi, d)
+            for j in range(dm):
+                X[:,j] = np.sin(x*(j+1))
+            mat = np.dot(X, X.T)
+            np.fill_diagonal(mat, np.diag(mat) + 3.1)
 
-        assert_allclose(mat, mat1, rtol=0.25, atol=1e-3)
+            # Try to recover the structure
+            rslt = cov_nearest_factor_homog(mat, dm)
+            mat1 = rslt.to_matrix()
 
-    @pytest.mark.parametrize('dm', [1, 2])
-    def test_cov_nearest_factor_homog_sparse(self, dm):
-        # Check that dense and sparse inputs give the same result
+            assert_allclose(mat, mat1, rtol=0.25, atol=1e-3)
+
+
+    # Check that dense and sparse inputs give the same result
+    def test_cov_nearest_factor_homog_sparse(self):
 
         d = 100
 
-        # Construct a test matrix with exact factor structure
-        X = np.zeros((d, dm), dtype=np.float64)
-        x = np.linspace(0, 2*np.pi, d)
-        for j in range(dm):
-            X[:, j] = np.sin(x*(j+1))
-        mat = np.dot(X, X.T)
-        np.fill_diagonal(mat, np.diag(mat) + 3.1)
+        for dm in 1,2:
 
-        # Fit to dense
-        rslt = cov_nearest_factor_homog(mat, dm)
-        mat1 = rslt.to_matrix()
+            # Construct a test matrix with exact factor structure
+            X = np.zeros((d,dm), dtype=np.float64)
+            x = np.linspace(0, 2*np.pi, d)
+            for j in range(dm):
+                X[:,j] = np.sin(x*(j+1))
+            mat = np.dot(X, X.T)
+            np.fill_diagonal(mat, np.diag(mat) + 3.1)
 
-        # Fit to sparse
-        smat = sparse.csr_matrix(mat)
-        rslt = cov_nearest_factor_homog(smat, dm)
-        mat2 = rslt.to_matrix()
+            # Fit to dense
+            rslt = cov_nearest_factor_homog(mat, dm)
+            mat1 = rslt.to_matrix()
 
-        assert_allclose(mat1, mat2, rtol=0.25, atol=1e-3)
+            # Fit to sparse
+            smat = sparse.csr_matrix(mat)
+            rslt = cov_nearest_factor_homog(smat, dm)
+            mat2 = rslt.to_matrix()
 
-    def test_corr_thresholded(self, reset_randomstate):
+            assert_allclose(mat1, mat2, rtol=0.25, atol=1e-3)
+
+    def test_corr_thresholded(self):
 
         import datetime
 
@@ -462,3 +476,4 @@ class Test_Factor:
         fcor *= (np.abs(fcor) >= 0.2)
 
         assert_allclose(tcor.todense(), fcor, rtol=0.25, atol=1e-3)
+

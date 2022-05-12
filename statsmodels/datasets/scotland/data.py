@@ -1,11 +1,10 @@
 """Taxation Powers Vote for the Scottish Parliament 1997 dataset."""
-from statsmodels.datasets import utils as du
 
 __docformat__ = 'restructuredtext'
 
 COPYRIGHT   = """Used with express permission from the original author,
 who retains all rights."""
-TITLE       = "Taxation Powers Vote for the Scottish Parliament 1997"
+TITLE       = "Taxation Powers Vote for the Scottish Parliamant 1997"
 SOURCE      = """
 Jeff Gill's `Generalized Linear Models: A Unified Approach`
 
@@ -52,6 +51,9 @@ NOTE        = """::
     returned by load.
 """
 
+import numpy as np
+from statsmodels.datasets import utils as du
+from os.path import dirname, abspath
 
 def load():
     """
@@ -59,11 +61,11 @@ def load():
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
-    return load_pandas()
-
+    data = _get_data()
+    return du.process_recarray(data, endog_idx=0, dtype=float)
 
 def load_pandas():
     """
@@ -71,14 +73,15 @@ def load_pandas():
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
     data = _get_data()
-    return du.process_pandas(data, endog_idx=0)
-
+    return du.process_recarray_pandas(data, endog_idx=0, dtype=float)
 
 def _get_data():
-    data = du.load_csv(__file__, 'scotvote.csv')
-    data = data.iloc[:, 1:9]
-    return data.astype(float)
+    filepath = dirname(abspath(__file__))
+    with open(filepath + '/scotvote.csv',"rb") as f:
+        data = np.recfromtxt(f, delimiter=",",
+                             names=True, dtype=float, usecols=(1,2,3,4,5,6,7,8))
+    return data

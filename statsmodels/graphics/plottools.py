@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def rainbow(n):
     """
     Returns a list of colors sampled at equal intervals over the spectrum.

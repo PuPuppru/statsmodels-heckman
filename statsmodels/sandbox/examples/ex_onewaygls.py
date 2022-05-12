@@ -70,7 +70,7 @@ def print_results(res):
 ##        else:
 ##            print ''
     from statsmodels.iolib import SimpleTable
-    print(SimpleTable([(['%r' % (row[0],)]
+    print(SimpleTable([(['%r'%(row[0],)]
                         + list(row[1])
                         + ['*']*(row[1][1]>0.5).item() ) for row in ft[1]],
                       headers=['pair', 'F-statistic','p-value','df_denom',
@@ -91,7 +91,7 @@ def print_results(res):
     print('Alternative model: all coefficients are allowed to be different')
     print('not verified but looks close to f-test result')
 
-    print('\nOLS parameters by group from individual, separate ols regressions')
+    print('\nOls parameters by group from individual, separate ols regressions')
     for group in sorted(res.olsbygroup):
         r = res.olsbygroup[group]
         print(group, r.params)
@@ -132,7 +132,7 @@ Alternative model: all coefficients are allowed to be different'
 not verified but looks close to f-test result'
 
 
-OLS parameters by group from individual, separate ols regressions'
+Ols parameters by group from individual, separate ols regressions'
 %(olsbg)s
 for group in sorted(res.olsbygroup):
     r = res.olsbygroup[group]
@@ -148,7 +148,7 @@ standard dev', np.sqrt(res.sigmabygroup)
 
     from statsmodels.iolib import SimpleTable
     resvals = {}
-    resvals['tab'] = str(SimpleTable([(['%r' % (row[0],)]
+    resvals['tab'] = str(SimpleTable([(['%r'%(row[0],)]
                         + list(row[1])
                         + ['*']*(row[1][1]>0.5).item() ) for row in ft[1]],
                       headers=['pair', 'F-statistic','p-value','df_denom',

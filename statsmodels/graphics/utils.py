@@ -1,5 +1,5 @@
 """Helper functions for graphics with Matplotlib."""
-from statsmodels.compat.python import lrange
+from statsmodels.compat.python import lrange, range, long
 
 __all__ = ['create_mpl_ax', 'create_mpl_fig']
 
@@ -19,16 +19,16 @@ def create_mpl_ax(ax=None):
 
     Parameters
     ----------
-    ax : AxesSubplot, optional
+    ax : Matplotlib AxesSubplot instance, optional
         If given, this subplot is used to plot in instead of a new figure being
         created.
 
     Returns
     -------
-    fig : Figure
+    fig : Matplotlib figure instance
         If `ax` is None, the created figure.  Otherwise the figure to which
         `ax` is connected.
-    ax : AxesSubplot
+    ax : Matplotlib AxesSubplot instance
         The created axis if `ax` is None, otherwise the axis that was passed
         in.
 
@@ -49,6 +49,7 @@ def create_mpl_ax(ax=None):
 
     >>> from statsmodels.graphics import utils
     >>> fig, ax = utils.create_mpl_ax(ax)
+
     """
     if ax is None:
         plt = _import_mpl()
@@ -68,19 +69,20 @@ def create_mpl_fig(fig=None, figsize=None):
 
     Parameters
     ----------
-    fig : Figure, optional
+    fig : Matplotlib figure instance, optional
         If given, this figure is simply returned.  Otherwise a new figure is
         created.
 
     Returns
     -------
-    Figure
+    fig : Matplotlib figure instance
         If `fig` is None, the created figure.  Otherwise the input `fig` is
         returned.
 
     See Also
     --------
     create_mpl_ax
+
     """
     if fig is None:
         plt = _import_mpl()
@@ -96,7 +98,7 @@ def maybe_name_or_idx(idx, model):
     """
     if idx is None:
         idx = lrange(model.exog.shape[1])
-    if isinstance(idx, int):
+    if isinstance(idx, (int, long)):
         exog_name = model.exog_names[idx]
         exog_idx = idx
     # anticipate index as list and recurse
@@ -124,8 +126,8 @@ def get_data_names(series_or_dataframe):
         names = getattr(series_or_dataframe, 'columns', None)
     if not names:
         shape = getattr(series_or_dataframe, 'shape', [1])
-        nvars = 1 if len(shape) == 1 else series_or_dataframe.shape[1]
-        names = ["X%d" for _ in range(nvars)]
+        nvars = 1 if len(shape) == 1 else series.shape[1]
+        names = ["X%d" for names in range(nvars)]
         if nvars == 1:
             names = names[0]
     else:

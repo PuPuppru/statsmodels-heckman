@@ -9,8 +9,9 @@ License: BSD-3
 
 import numpy as np
 
+from statsmodels.compat.python import string_types
 
-class StandardizeTransform:
+class StandardizeTransform(object):
     """class to reparameterize a model for standardized exog
 
     Parameters
@@ -38,6 +39,7 @@ class StandardizeTransform:
     which is required in some discrete models when the endog cannot be rescaled
     or demeaned.
     The transformation is full rank and does not drop the constant.
+
     """
 
     def __init__(self, data, ddof=1, const_idx=None, demean=True):
@@ -49,11 +51,11 @@ class StandardizeTransform:
         if const_idx is None:
             const_idx = np.nonzero(self.scale == 0)[0]
             if len(const_idx) == 0:
-                const_idx = 'n'
+                const_idx = 'nc'
             else:
                 const_idx = int(const_idx)
 
-        if const_idx != 'n':
+        if const_idx != 'nc':
             self.mean[const_idx] = 0
             self.scale[const_idx] = 1
 
@@ -64,6 +66,7 @@ class StandardizeTransform:
 
     def transform(self, data):
         """standardize the data using the stored transformation
+
         """
         # could use scipy.stats.zscore instead
         if self.mean is None:
@@ -84,10 +87,11 @@ class StandardizeTransform:
         params_new : ndarray
             parameters transformed to the parameterization of the original
             model
+
         """
 
         params_new = params / self.scale
-        if self.const_idx != 'n':
+        if self.const_idx != 'nc':
             params_new[self.const_idx] -= (params_new * self.mean).sum()
 
         return params_new

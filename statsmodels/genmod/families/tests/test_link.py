@@ -1,11 +1,9 @@
 """
 Test functions for genmod.families.links
 """
+from statsmodels.compat.python import range
 import numpy as np
-from numpy.testing import assert_allclose, assert_equal, assert_array_less
-from scipy import stats
-import pytest
-
+from numpy.testing import assert_allclose, assert_equal
 import statsmodels.genmod.families as families
 from statsmodels.tools import numdiff as nd
 
@@ -20,16 +18,10 @@ log = links.log()
 probit = links.probit()
 cauchy = links.cauchy()
 cloglog = links.CLogLog()
-loglog = links.LogLog()
 negbinom = links.NegativeBinomial()
 
-# TODO: parametrize all these tess
-Links = [logit, inverse_power, sqrt, inverse_squared, identity,
-         log, probit, cauchy, cloglog, loglog, negbinom]
-
-# links with defined second derivative of inverse link.
-LinksISD = [inverse_power, sqrt, inverse_squared, identity,
-            cauchy, probit, loglog]
+Links = [logit, inverse_power, sqrt, inverse_squared, identity, log, probit, cauchy,
+         cloglog, negbinom]
 
 
 def get_domainvalue(link):
@@ -37,24 +29,23 @@ def get_domainvalue(link):
     Get a value in the domain for a given family.
     """
     z = -np.log(np.random.uniform(0, 1))
-    if isinstance(link, links.CLogLog):  # prone to overflow
+    if type(link) == type(cloglog): # prone to overflow
         z = min(z, 3)
-    elif isinstance(link, links.LogLog):
-        z = max(z, -3)
-    elif isinstance(link, links.NegativeBinomial):
-        # domain is negative numbers
+    elif type(link) == type(negbinom): # domain is negative numbers
         z = -z
     return z
 
-
 def test_inverse():
-    # Logic check that link.inverse(link) and link(link.inverse)
-    # are the identity.
+    """
+    Logic check that link.inverse(link) and link(link.inverse) are the
+    identity.
+    """
+
     np.random.seed(3285)
 
     for link in Links:
         for k in range(10):
-            p = np.random.uniform(0, 1)  # In domain for all families
+            p = np.random.uniform(0, 1) # In domain for all families
             d = link.inverse(link(p))
             assert_allclose(d, p, atol=1e-8, err_msg=str(link))
 
@@ -64,7 +55,9 @@ def test_inverse():
 
 
 def test_deriv():
-    # Check link function derivatives using numeric differentiation.
+    """
+    Check link function derivatives using numeric differentiation.
+    """
 
     np.random.seed(24235)
 
@@ -75,54 +68,43 @@ def test_deriv():
             da = nd.approx_fprime(np.r_[p], link)
             assert_allclose(d, da, rtol=1e-6, atol=1e-6,
                             err_msg=str(link))
-            if not isinstance(link, (type(inverse_power),
-                                     type(inverse_squared))):
-                # check monotonically increasing
-                assert_array_less(-d, 0)
 
 
 def test_deriv2():
-    # Check link function second derivatives using numeric differentiation.
+    """
+    Check link function second derivatives using numeric
+    differentiation.
+    """
 
     np.random.seed(24235)
 
     for link in Links:
+        # TODO: Resolve errors with the numeric derivatives
+        if type(link) == type(probit):
+            continue
         for k in range(10):
             p = np.random.uniform(0, 1)
             p = np.clip(p, 0.01, 0.99)
-            if isinstance(link, links.cauchy):
+            if type(link) == type(cauchy):
                 p = np.clip(p, 0.03, 0.97)
             d = link.deriv2(p)
             da = nd.approx_fprime(np.r_[p], link.deriv)
-            assert_allclose(d, da, rtol=5e-6, atol=1e-6,
+            assert_allclose(d, da, rtol=1e-6, atol=1e-6,
                             err_msg=str(link))
 
-
 def test_inverse_deriv():
-    # Logic check that inverse_deriv equals 1/link.deriv(link.inverse)
+    """
+    Logic check that inverse_deriv equals 1/link.deriv(link.inverse)
+    """
 
     np.random.seed(24235)
 
     for link in Links:
         for k in range(10):
-            z = -np.log(np.random.uniform())  # In domain for all families
+            z = -np.log(np.random.uniform()) # In domain for all families
             d = link.inverse_deriv(z)
             f = 1 / link.deriv(link.inverse(z))
             assert_allclose(d, f, rtol=1e-8, atol=1e-10,
-                            err_msg=str(link))
-
-
-def test_inverse_deriv2():
-    # Check second derivative of inverse link using numeric differentiation.
-
-    np.random.seed(24235)
-
-    for link in LinksISD:
-        for k in range(10):
-            z = get_domainvalue(link)
-            d2 = link.inverse_deriv2(z)
-            d2a = nd.approx_fprime(np.r_[z], link.inverse_deriv)
-            assert_allclose(d2, d2a, rtol=5e-6, atol=1e-6,
                             err_msg=str(link))
 
 
@@ -143,49 +125,9 @@ def test_invlogit_stability():
     zinv = logit.inverse(z)
     assert_equal(zinv, np.ones_like(z))
 
-
-class MyCLogLog(links.Link):
-
-    def __call__(self, p):
-        # p = self._clean(p)
-        return np.log(-np.log(1 - p))
-
-    def inverse(self, z):
-        return 1 - np.exp(-np.exp(z))
-
-    def deriv(self, p):
-        # p = self._clean(p)
-        return 1. / ((p - 1) * (np.log(1 - p)))
-
-
-class CasesCDFLink():
-    # just as namespace to hold cases for test_cdflink
-
-    link_pairs = [
-        (links.CDFLink(dbn=stats.gumbel_l), links.cloglog()),
-        (links.CDFLink(dbn=stats.gumbel_r), links.loglog()),
-        (links.CDFLink(dbn=stats.norm), links.probit()),
-        (links.CDFLink(dbn=stats.logistic), links.logit()),
-        (links.CDFLink(dbn=stats.t(1)), links.cauchy()),
-        # approximation of t by normal is not good enough for rtol, atol
-        # (links.CDFLink(dbn=stats.t(1000000)), links.probit()),
-
-        (MyCLogLog(), links.cloglog()),  # not a cdflink, but compares
-        ]
-
-    methods = ['__call__', 'deriv', 'inverse', 'inverse_deriv', 'deriv2',
-               'inverse_deriv2']
-
-    p = np.linspace(0, 1, 6)
-    eps = 1e-3
-    p = np.clip(p, eps, 1 - eps)
-
-
-@pytest.mark.parametrize("m", CasesCDFLink.methods)
-@pytest.mark.parametrize("link1, link2", CasesCDFLink.link_pairs)
-def test_cdflink(m, link1, link2):
-    p = CasesCDFLink.p
-    res1 = getattr(link1, m)(p)
-    res2 = getattr(link2, m)(p)
-
-    assert_allclose(res1, res2, atol=1e-8, rtol=1e-8)
+if __name__=="__main__":
+    #run_module_suite()
+    #taken from Fernando Perez:
+    import nose
+    nose.runmodule(argv=[__file__,'-vvs','-x','--pdb'],
+                       exit=False)

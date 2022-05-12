@@ -14,15 +14,17 @@ Computes a regularzation path with both packages.  The coefficient values in
 
 The results "prove" that the regularization paths are the same.  Note that
     finding the reparameterization is non-trivial since the coefficient paths
-    are NOT monotonic.  As a result, the paths do not match up perfectly.
+    are NOT monotonic.  As a result, the paths don't match up perfectly.
 """
-from statsmodels.compat.python import lrange
-
-import matplotlib.pyplot as plt
-import numpy as np
+from __future__ import print_function
+from statsmodels.compat.python import range, lrange
 from sklearn import linear_model
-
+from sklearn import datasets
 import statsmodels.api as sm
+import numpy as np
+import matplotlib.pyplot as plt
+import pdb  # pdb.set_trace
+import sys
 
 ## Decide which dataset to use
 # Use either spector or anes96
@@ -45,7 +47,7 @@ else:
 N = 200  # number of points to solve at
 K = X.shape[1]
 
-## statsmodels
+## Statsmodels
 logit_mod = sm.Logit(Y, X)
 sm_coeff = np.zeros((N, K))  # Holds the coefficients
 if use_spector:
@@ -83,9 +85,7 @@ s = np.zeros(N)
 s = np.searchsorted(sk_special_X, sm_special_X)
 
 ## Plot
-plt.figure(2)
-plt.clf()
-plt.grid()
+plt.figure(2);plt.clf();plt.grid()
 plt.xlabel('Index in sklearn simulation')
 plt.ylabel('Coefficient value')
 plt.title('Regularization Paths')

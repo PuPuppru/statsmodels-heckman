@@ -7,10 +7,15 @@ Created on Thu Feb 11 23:41:53 2010
 Author: josef-pktd
 copyright: Simplified BSD see license.txt
 """
+from __future__ import print_function
 import numpy as np
+from numpy.testing import assert_almost_equal
+
+import matplotlib.pyplot as plt
 
 import numdifftools as ndt
 
+import statsmodels.api as sm
 from statsmodels.sandbox import tsa
 from statsmodels.tsa.arma_mle import Arma  # local import
 from statsmodels.tsa.arima_process import arma_generate_sample
@@ -138,3 +143,4 @@ if 'arma' in examples:
 
     #fmin estimates for coefficients in ARMA(3,3) look good
     #but not inverse Hessian, sometimes negative values for variance
+

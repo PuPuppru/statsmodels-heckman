@@ -10,6 +10,9 @@ multigroup:
     rest. It allows to test if the variables in the group are significantly
     more significant than outside the group.
 """
+
+from statsmodels.compat.pandas import sort_values
+from statsmodels.compat.python import iteritems, string_types
 from patsy import dmatrix
 import pandas as pd
 from statsmodels.api import OLS
@@ -41,7 +44,7 @@ def _model2dataframe(model_endog, model_exog, model_type=OLS, **kwargs):
 
 
 def multiOLS(model, dataframe, column_list=None, method='fdr_bh',
-             alpha=0.05, subset=None, model_type=OLS, **kwargs):
+    alpha=0.05, subset=None, model_type=OLS, **kwargs):
     """apply a linear model to several endogenous variables on a dataframe
 
     Take a linear model definition via formula and a dataframe that will be
@@ -51,18 +54,18 @@ def multiOLS(model, dataframe, column_list=None, method='fdr_bh',
 
     Parameters
     ----------
-    model : str
+    model : string
         formula description of the model
     dataframe : pandas.dataframe
         dataframe where the model will be evaluated
-    column_list : list[str], optional
+    column_list : list of strings, optional
         Names of the columns to analyze with the model.
         If None (Default) it will perform the function on all the
         eligible columns (numerical type and not in the model definition)
     model_type : model class, optional
         The type of model to be used. The default is the linear model.
         Can be any linear model (OLS, WLS, GLS, etc..)
-    method : str, optional
+    method: string, optional
         the method used to perform the pvalue correction for multiple testing.
         default is the Benjamini/Hochberg, other available methods are:
 
@@ -75,9 +78,9 @@ def multiOLS(model, dataframe, column_list=None, method='fdr_bh',
             `fdr_bh` : Benjamini/Hochberg
             `fdr_by` : Benjamini/Yekutieli
 
-    alpha : float, optional
+    alpha: float, optional
         the significance level used for the pvalue correction (default 0.05)
-    subset : bool array
+    subset: boolean array
         the selected rows to be used in the regression
 
     all the other parameters will be directed to the model creation.
@@ -88,7 +91,7 @@ def multiOLS(model, dataframe, column_list=None, method='fdr_bh',
         a dataframe containing an extract from the summary of the model
         obtained for each columns. It will give the model complexive f test
         result and p-value, and the regression value and standard deviarion
-        for each of the regressors. The DataFrame has a hierachical column
+        for each of the regressors. The Dataframe has a hierachical column
         structure, divided as:
 
             - params: contains the parameters resulting from the models. Has
@@ -140,16 +143,16 @@ def multiOLS(model, dataframe, column_list=None, method='fdr_bh',
     >>> multiOLS('GNP + 0', df, 'GNPDEFL')
     """
     # data normalization
-    # if None take all the numerical columns that are not present in the model
+    # if None take all the numerical columns that aren't present in the model
     # it's not waterproof but is a good enough criterion for everyday use
     if column_list is None:
         column_list = [name for name in dataframe.columns
                       if dataframe[name].dtype != object and name not in model]
     # if it's a single string transform it in a single element list
-    if isinstance(column_list, str):
+    if isinstance(column_list, string_types):
         column_list = [column_list]
     if subset is not None:
-        dataframe = dataframe.loc[subset]
+        dataframe = dataframe.ix[subset]
     # perform each model and retrieve the statistics
     col_results = {}
     # as the model will use always the same endogenous variables
@@ -169,7 +172,7 @@ def multiOLS(model, dataframe, column_list=None, method='fdr_bh',
     # mangle them togheter and sort by complexive p-value
     summary = pd.DataFrame(col_results)
     # order by the p-value: the most useful model first!
-    summary = summary.T.sort_values([('pvals', '_f_test')])
+    summary = sort_values(summary.T, [('pvals', '_f_test')])
     summary.index.name = 'endogenous vars'
     # implementing the pvalue correction method
     smt = stats.multipletests
@@ -230,21 +233,21 @@ def multigroup(pvals, groups, exact=True, keep_all=True, alpha=0.05):
 
     Parameters
     ----------
-    pvals : pandas series of boolean
+    pvals: pandas series of boolean
         the significativity of the variables under analysis
-    groups : dict of list
+    groups: dict of list
         the name of each category of variables under exam.
         each one is a list of the variables included
-    exact : bool, optional
+    exact: boolean, optional
         If True (default) use the fisher exact test, otherwise
         use the chi squared test for contingencies tables.
         For high number of elements in the array the fisher test can
         be significantly slower than the chi squared.
-    keep_all : bool, optional
+    keep_all: boolean, optional
         if False it will drop those groups where the fraction
         of positive is below the expected result. If True (default)
          it will keep all the significant results.
-    alpha : float, optional
+    alpha: float, optional
         the significativity level for the pvalue correction
         on the whole set of groups (not inside the groups themselves).
 
@@ -278,11 +281,11 @@ def multigroup(pvals, groups, exact=True, keep_all=True, alpha=0.05):
     Examples
     --------
     A toy example on a real dataset, the Guerry dataset from R
-    >>> url = "https://raw.githubusercontent.com/vincentarelbundock/"
+    >>> url = "http://vincentarelbundock.github.com/"
     >>> url = url + "Rdatasets/csv/HistData/Guerry.csv"
     >>> df = pd.read_csv(url, index_col='dept')
 
-    evaluate the relationship between the various paramenters whith the Wealth
+    evaluate the relationship between the variuos paramenters whith the Wealth
     >>> pvals = multiOLS('Wealth', df)['adj_pvals', '_f_test']
 
     define the groups
@@ -306,7 +309,7 @@ def multigroup(pvals, groups, exact=True, keep_all=True, alpha=0.05):
         '_in_non': {},
         '_out_sign': {},
         '_out_non': {}}
-    for group_name, group_list in groups.items():
+    for group_name, group_list in iteritems(groups):
         res = _test_group(pvals, group_name, group_list, exact)
         results['pvals'][group_name] = res[0]
         results['increase'][group_name] = res[1]
@@ -314,7 +317,7 @@ def multigroup(pvals, groups, exact=True, keep_all=True, alpha=0.05):
         results['_in_non'][group_name] = res[2][1]
         results['_out_sign'][group_name] = res[2][2]
         results['_out_non'][group_name] = res[2][3]
-    result_df = pd.DataFrame(results).sort_values('pvals')
+    result_df = sort_values(pd.DataFrame(results), 'pvals')
     if not keep_all:
         result_df = result_df[result_df.increase]
     smt = stats.multipletests

@@ -3,6 +3,7 @@ Holds files for l1 regularization of LikelihoodModel, using cvxopt.
 """
 import numpy as np
 import statsmodels.base.l1_solvers_common as l1_solvers_common
+from cvxopt import solvers, matrix
 
 
 def fit_l1_cvxopt_cp(
@@ -39,9 +40,9 @@ def fit_l1_cvxopt_cp(
     auto_trim_tol : float
         For sue when trim_mode == 'auto'.  Use
     qc_tol : float
-        Print warning and do not allow auto trim when (ii) in "Theory" (above)
+        Print warning and don't allow auto trim when (ii) in "Theory" (above)
         is violated by this much.
-    qc_verbose : bool
+    qc_verbose : Boolean
         If true, print out a full QC report upon failure
     abstol : float
         absolute accuracy (default: 1e-7).
@@ -53,8 +54,6 @@ def fit_l1_cvxopt_cp(
         number of iterative refinement steps when solving KKT equations
         (default: 1).
     """
-    from cvxopt import solvers, matrix
-
     start_params = np.array(start_params).ravel('F')
 
     ## Extract arguments
@@ -117,18 +116,17 @@ def fit_l1_cvxopt_cp(
         auto_trim_tol)
 
     ### Pack up return values for statsmodels
-    # TODO These retvals are returned as mle_retvals...but the fit was not ML
+    # TODO These retvals are returned as mle_retvals...but the fit wasn't ML
     if full_output:
         fopt = f_0(x)
         gopt = float('nan')  # Objective is non-differentiable
         hopt = float('nan')
         iterations = float('nan')
-        converged = (results['status'] == 'optimal')
-        warnflag = results['status']
+        converged = 'True' if results['status'] == 'optimal'\
+            else results['status']
         retvals = {
             'fopt': fopt, 'converged': converged, 'iterations': iterations,
-            'gopt': gopt, 'hopt': hopt, 'trimmed': trimmed,
-            'warnflag': warnflag}
+            'gopt': gopt, 'hopt': hopt, 'trimmed': trimmed}
     else:
         x = np.array(results['x']).ravel()
         params = x[:k_params]
@@ -144,8 +142,6 @@ def _objective_func(f, x, k_params, alpha, *args):
     """
     The regularized objective function.
     """
-    from cvxopt import matrix
-
     x_arr = np.asarray(x)
     params = x_arr[:k_params].ravel()
     u = x_arr[k_params:]
@@ -159,8 +155,6 @@ def _fprime(score, x, k_params, alpha):
     """
     The regularized derivative.
     """
-    from cvxopt import matrix
-
     x_arr = np.asarray(x)
     params = x_arr[:k_params].ravel()
     # Call the numpy version
@@ -174,9 +168,7 @@ def _get_G(k_params):
     """
     The linear inequality constraint matrix.
     """
-    from cvxopt import matrix
-
-    I = np.eye(k_params)  # noqa:E741
+    I = np.eye(k_params)
     A = np.concatenate((-I, -I), axis=1)
     B = np.concatenate((I, -I), axis=1)
     C = np.concatenate((A, B), axis=0)
@@ -191,8 +183,6 @@ def _hessian_wrapper(hess, x, z, k_params):
     cvxopt wants the hessian of the objective function and the constraints.
         Since our constraints are linear, this part is all zeros.
     """
-    from cvxopt import matrix
-
     x_arr = np.asarray(x)
     params = x_arr[:k_params].ravel()
     zh_x = np.asarray(z[0]) * hess(params)

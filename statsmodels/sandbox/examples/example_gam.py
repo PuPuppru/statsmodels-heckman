@@ -3,18 +3,16 @@
 Note: uncomment plt.show() to display graphs
 '''
 
-import time
+example = 2  # 1,2 or 3
 
 import numpy as np
 import numpy.random as R
 import matplotlib.pyplot as plt
-import scipy.stats
 
 from statsmodels.sandbox.gam import AdditiveModel
 from statsmodels.sandbox.gam import Model as GAM #?
 from statsmodels.genmod.families import family
-
-example = 2  # 1,2 or 3
+from statsmodels.genmod.generalized_linear_model import GLM
 
 standardize = lambda x: (x - x.mean()) / x.std()
 demean = lambda x: (x - x.mean())
@@ -50,6 +48,7 @@ if example == 1:
     plt.legend()
     plt.title('gam.AdditiveModel')
 
+import scipy.stats, time
 
 if example == 2:
     print("binomial")
@@ -98,3 +97,4 @@ plt.show()
 ##     pylab.plot(x2, standardize(m.smoothers[1](x2)), 'b')
 ##     pylab.plot(x2, standardize(f2(x2)), linewidth=2)
 ##     pylab.show()
+

@@ -25,7 +25,7 @@ res = multiOLS('GNP + 0', df, ['GNPDEFL', 'TOTEMP', 'POP'])
 print(res.to_string())
 
 
-url = "https://raw.githubusercontent.com/vincentarelbundock/"
+url = "http://vincentarelbundock.github.com/"
 url = url + "Rdatasets/csv/HistData/Guerry.csv"
 df = pd.read_csv(url, index_col=1) #'dept')
 

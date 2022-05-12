@@ -1,18 +1,21 @@
-from statsmodels.compat.python import lrange
-
-from io import StringIO
-from os import environ, makedirs
-from os.path import abspath, dirname, exists, expanduser, join
+from statsmodels.compat.numpy import recarray_select
+from statsmodels.compat.python import (range, StringIO, urlopen,
+                                       HTTPError, URLError, lrange,
+                                       cPickle, urljoin, BytesIO, long, PY3)
+import sys
 import shutil
-from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
-from urllib.request import urlopen
+from os import environ
+from os import makedirs
+from os.path import expanduser
+from os.path import exists
+from os.path import join
 
 import numpy as np
-from pandas import Index, read_csv, read_stata
+from numpy import array
+from pandas import read_csv, DataFrame, Index
 
 
-def webuse(data, baseurl='https://www.stata-press.com/data/r11/', as_df=True):
+def webuse(data, baseurl='http://www.stata-press.com/data/r11/', as_df=True):
     """
     Download and return an example dataset from Stata.
 
@@ -23,12 +26,12 @@ def webuse(data, baseurl='https://www.stata-press.com/data/r11/', as_df=True):
     baseurl : str
         The base URL to the stata datasets.
     as_df : bool
-        Deprecated. Always returns a DataFrame
+        If True, returns a `pandas.DataFrame`
 
     Returns
     -------
-    dta : DataFrame
-        A DataFrame containing the Stata dataset.
+    dta : Record Array
+        A record array containing the Stata dataset.
 
     Examples
     --------
@@ -36,11 +39,19 @@ def webuse(data, baseurl='https://www.stata-press.com/data/r11/', as_df=True):
 
     Notes
     -----
-    Make sure baseurl has trailing forward slash. Does not do any
+    Make sure baseurl has trailing forward slash. Doesn't do any
     error checking in response URLs.
     """
+    # lazy imports
+    from statsmodels.iolib import genfromdta
+
     url = urljoin(baseurl, data+'.dta')
-    return read_stata(url)
+    dta = urlopen(url)
+    dta = BytesIO(dta.read())  # make it truly file-like
+    if as_df:  # could make this faster if we don't process dta twice?
+        return DataFrame.from_records(genfromdta(dta))
+    else:
+        return genfromdta(dta)
 
 
 class Dataset(dict):
@@ -56,7 +67,7 @@ class Dataset(dict):
         # Some datasets have string variables. If you want a raw_data
         # attribute you must create this in the dataset's load function.
         try:  # some datasets have string variables
-            self.raw_data = self.data.astype(float)
+            self.raw_data = self.data.view((float, len(self.names)))
         except:
             pass
 
@@ -64,35 +75,73 @@ class Dataset(dict):
         return str(self.__class__)
 
 
-def process_pandas(data, endog_idx=0, exog_idx=None, index_idx=None):
+def process_recarray(data, endog_idx=0, exog_idx=None, stack=True, dtype=None):
+    names = list(data.dtype.names)
+
+    if isinstance(endog_idx, (int, long)):
+        endog = array(data[names[endog_idx]], dtype=dtype)
+        endog_name = names[endog_idx]
+        endog_idx = [endog_idx]
+    else:
+        endog_name = [names[i] for i in endog_idx]
+
+        if stack:
+            endog = np.column_stack(data[field] for field in endog_name)
+        else:
+            endog = data[endog_name]
+
+    if exog_idx is None:
+        exog_name = [names[i] for i in range(len(names))
+                     if i not in endog_idx]
+    else:
+        exog_name = [names[i] for i in exog_idx]
+
+    if stack:
+        exog = np.column_stack(data[field] for field in exog_name)
+    else:
+        exog = recarray_select(data, exog_name)
+
+    if dtype:
+        endog = endog.astype(dtype)
+        exog = exog.astype(dtype)
+
+    dataset = Dataset(data=data, names=names, endog=endog, exog=exog,
+                      endog_name=endog_name, exog_name=exog_name)
+
+    return dataset
+
+
+def process_recarray_pandas(data, endog_idx=0, exog_idx=None, dtype=None,
+                            index_idx=None):
+
+    data = DataFrame(data, dtype=dtype)
     names = data.columns
 
-    if isinstance(endog_idx, int):
+    if isinstance(endog_idx, (int, long)):
         endog_name = names[endog_idx]
-        endog = data[endog_name].copy()
+        endog = data[endog_name]
         if exog_idx is None:
             exog = data.drop([endog_name], axis=1)
         else:
-            exog = data[names[exog_idx]].copy()
+            exog = data.filter(names[exog_idx])
     else:
-        endog = data.loc[:, endog_idx].copy()
+        endog = data.ix[:, endog_idx]
         endog_name = list(endog.columns)
         if exog_idx is None:
             exog = data.drop(endog_name, axis=1)
-        elif isinstance(exog_idx, int):
-            exog = data[names[exog_idx]].copy()
+        elif isinstance(exog_idx, (int, long)):
+            exog = data.filter([names[exog_idx]])
         else:
-            exog = data[names[exog_idx]].copy()
+            exog = data.filter(names[exog_idx])
 
     if index_idx is not None:  # NOTE: will have to be improved for dates
-        index = Index(data.iloc[:, index_idx])
-        endog.index = index
-        exog.index = index.copy()
+        endog.index = Index(data.ix[:, index_idx])
+        exog.index = Index(data.ix[:, index_idx])
         data = data.set_index(names[index_idx])
 
     exog_name = list(exog.columns)
-    dataset = Dataset(data=data, names=list(names), endog=endog,
-                      exog=exog, endog_name=endog_name, exog_name=exog_name)
+    dataset = Dataset(data=data, names=list(names), endog=endog, exog=exog,
+                      endog_name=endog_name, exog_name=exog_name)
     return dataset
 
 
@@ -118,16 +167,28 @@ def _get_cache(cache):
 
 
 def _cache_it(data, cache_path):
-    import zlib
-    with open(cache_path, "wb") as zf:
-        zf.write(zlib.compress(data))
+    if PY3:
+        # for some reason encode("zip") won't work for me in Python 3?
+        import zlib
+        # use protocol 2 so can open with python 2.x if cached in 3.x
+        open(cache_path, "wb").write(zlib.compress(cPickle.dumps(data,
+                                                                 protocol=2)))
+    else:
+        open(cache_path, "wb").write(cPickle.dumps(data).encode("zip"))
 
 
 def _open_cache(cache_path):
-    import zlib
-    # return as bytes object encoded in utf-8 for cross-compat of cached
-    with open(cache_path, 'rb') as zf:
-        return zlib.decompress(zf.read())
+    if PY3:
+        # NOTE: don't know why but decode('zip') doesn't work on my
+        # Python 3 build
+        import zlib
+        data = zlib.decompress(open(cache_path, 'rb').read())
+        # return as bytes object encoded in utf-8 for cross-compat of cached
+        data = cPickle.loads(data).encode('utf-8')
+    else:
+        data = open(cache_path, 'rb').read().decode('zip')
+        data = cPickle.loads(data)
+    return data
 
 
 def _urlopen_cached(url, cache):
@@ -138,23 +199,17 @@ def _urlopen_cached(url, cache):
     """
     from_cache = False
     if cache is not None:
-        file_name = url.split("://")[-1].replace('/', ',')
-        file_name = file_name.split('.')
-        if len(file_name) > 1:
-            file_name[-2] += '-v2'
-        else:
-            file_name[0] += '-v2'
-        file_name = '.'.join(file_name) + ".zip"
-        cache_path = join(cache, file_name)
+        cache_path = join(cache,
+                          url.split("://")[-1].replace('/', ',') + ".zip")
         try:
             data = _open_cache(cache_path)
             from_cache = True
         except:
             pass
 
-    # not using the cache or did not find it in cache
+    # not using the cache or didn't find it in cache
     if not from_cache:
-        data = urlopen(url, timeout=3).read()
+        data = urlopen(url).read()
         if cache is not None:  # then put it in the cache
             _cache_it(data, cache_path)
     return data, from_cache
@@ -177,19 +232,16 @@ def _get_data(base_url, dataname, cache, extension="csv"):
 def _get_dataset_meta(dataname, package, cache):
     # get the index, you'll probably want this cached because you have
     # to download info about all the data to get info about any of the data...
-    index_url = ("https://raw.githubusercontent.com/vincentarelbundock/"
-                 "Rdatasets/master/datasets.csv")
+    index_url = ("https://raw.github.com/vincentarelbundock/Rdatasets/master/"
+                 "datasets.csv")
     data, _ = _urlopen_cached(index_url, cache)
-    data = data.decode('utf-8', 'strict')
+    # Python 3
+    if PY3:  # pragma: no cover
+        data = data.decode('utf-8', 'strict')
     index = read_csv(StringIO(data))
     idx = np.logical_and(index.Item == dataname, index.Package == package)
-    if not idx.any():
-        raise ValueError(
-            f"Item {dataname} from Package {package} was not found. Check "
-            f"the CSV file at {index_url} to verify the Item and Package."
-        )
-    dataset_meta = index.loc[idx]
-    return dataset_meta["Title"].iloc[0]
+    dataset_meta = index.ix[idx]
+    return dataset_meta["Title"].item()
 
 
 def get_rdataset(dataname, package="datasets", cache=False):
@@ -210,7 +262,7 @@ def get_rdataset(dataname, package="datasets", cache=False):
 
     Returns
     -------
-    dataset : Dataset
+    dataset : Dataset instance
         A `statsmodels.data.utils.Dataset` instance. This objects has
         attributes:
 
@@ -219,6 +271,7 @@ def get_rdataset(dataname, package="datasets", cache=False):
         * package - The package from which the data came
         * from_cache - Whether not cached data was retrieved
         * __doc__ - The verbatim R documentation.
+
 
     Notes
     -----
@@ -229,9 +282,9 @@ def get_rdataset(dataname, package="datasets", cache=False):
     dataset is in the cache, it's used.
     """
     # NOTE: use raw github bc html site might not be most up to date
-    data_base_url = ("https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/"
+    data_base_url = ("https://raw.github.com/vincentarelbundock/Rdatasets/"
                      "master/csv/"+package+"/")
-    docs_base_url = ("https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/"
+    docs_base_url = ("https://raw.github.com/vincentarelbundock/Rdatasets/"
                      "master/doc/"+package+"/rst/")
     cache = _get_cache(cache)
     data, from_cache = _get_data(data_base_url, dataname, cache)
@@ -257,7 +310,7 @@ def get_data_home(data_home=None):
     in the user home folder.
 
     Alternatively, it can be set by the 'STATSMODELS_DATA' environment
-    variable or programatically by giving an explicit folder path. The
+    variable or programatically by giving an explit folder path. The
     '~' symbol is expanded to the user home folder.
 
     If the folder does not already exist, it is automatically created.
@@ -276,7 +329,6 @@ def clear_data_home(data_home=None):
     data_home = get_data_home(data_home)
     shutil.rmtree(data_home)
 
-
 def check_internet(url=None):
     """Check if internet is available"""
     url = "https://github.com" if url is None else url
@@ -285,48 +337,3 @@ def check_internet(url=None):
     except URLError as err:
         return False
     return True
-
-
-def strip_column_names(df):
-    """
-    Remove leading and trailing single quotes
-
-    Parameters
-    ----------
-    df : DataFrame
-        DataFrame to process
-
-    Returns
-    -------
-    df : DataFrame
-        DataFrame with stripped column names
-
-    Notes
-    -----
-    In-place modification
-    """
-    columns = []
-    for c in df:
-        if c.startswith('\'') and c.endswith('\''):
-            c = c[1:-1]
-        elif c.startswith('\''):
-            c = c[1:]
-        elif c.endswith('\''):
-            c = c[:-1]
-        columns.append(c)
-    df.columns = columns
-    return df
-
-
-def load_csv(base_file, csv_name, sep=',', convert_float=False):
-    """Standard simple csv loader"""
-    filepath = dirname(abspath(base_file))
-    filename = join(filepath,csv_name)
-    engine = 'python' if sep != ',' else 'c'
-    float_precision = {}
-    if engine == 'c':
-        float_precision = {'float_precision': 'high'}
-    data = read_csv(filename, sep=sep, engine=engine, **float_precision)
-    if convert_float:
-        data = data.astype(float)
-    return data

@@ -7,11 +7,13 @@ Author: Josef Perktold
 """
 
 import numpy as np
-from numpy.testing import assert_almost_equal, assert_equal, assert_allclose
+from numpy.testing import assert_almost_equal, assert_equal
 
 from statsmodels.stats.inter_rater import (fleiss_kappa, cohens_kappa,
                                            to_table, aggregate_raters)
-from statsmodels.tools.testing import Holder
+
+class Holder(object):
+    pass
 
 
 table0 = np.asarray('''\
@@ -74,42 +76,7 @@ def test_fleiss_kappa():
     assert_almost_equal(fleiss_kappa(table1), kappa_wp, decimal=3)
 
 
-def test_fleis_randolph():
-    # reference numbers from online calculator
-    # http://justusrandolph.net/kappa/#dInfo
-    table = [[7, 0], [7, 0]]
-    assert_equal(fleiss_kappa(table, method='unif'), 1)
-
-    table = [[6.99, 0.01], [6.99, 0.01]]
-    # % Overall Agreement 0.996671
-    # Fixed Marginal Kappa: -0.166667
-    # Free Marginal Kappa: 0.993343
-    assert_allclose(fleiss_kappa(table), -0.166667, atol=6e-6)
-    assert_allclose(fleiss_kappa(table, method='unif'), 0.993343, atol=6e-6)
-
-    table = [[7, 1], [3, 5]]
-    # % Overall Agreement 0.607143
-    # Fixed Marginal Kappa: 0.161905
-    # Free Marginal Kappa: 0.214286
-    assert_allclose(fleiss_kappa(table, method='fleiss'), 0.161905, atol=6e-6)
-    assert_allclose(fleiss_kappa(table, method='randolph'), 0.214286, atol=6e-6)
-
-    table = [[7, 0], [0, 7]]
-    # % Overall Agreement 1.000000
-    # Fixed Marginal Kappa: 1.000000
-    # Free Marginal Kappa: 1.000000
-    assert_allclose(fleiss_kappa(table), 1)
-    assert_allclose(fleiss_kappa(table, method='uniform'), 1)
-
-    table = [[6, 1, 0], [0, 7, 0]]
-    # % Overall Agreement 0.857143
-    # Fixed Marginal Kappa: 0.708333
-    # Free Marginal Kappa: 0.785714
-    assert_allclose(fleiss_kappa(table), 0.708333, atol=6e-6)
-    assert_allclose(fleiss_kappa(table, method='rand'), 0.785714, atol=6e-6)
-
-
-class CheckCohens:
+class CheckCohens(object):
 
     def test_results(self):
         res = self.res
@@ -122,17 +89,16 @@ class CheckCohens:
         assert_equal(str(res), self.res_string)
 
 
-class TestUnweightedCohens(CheckCohens):
-    # comparison to printout of a SAS example
-    @classmethod
-    def setup_class(cls):
+class UnweightedCohens(CheckCohens):
+    #comparison to printout of a SAS example
+    def __init__(self):
         #temporary: res instance is at last position
-        cls.res = cohens_kappa(table10)
+        self.res = cohens_kappa(table10)
         res10_sas = [0.4842, 0.1380, 0.2137, 0.7547]
         res10_sash0 = [0.1484, 3.2626, 0.0006, 0.0011]  #for test H0:kappa=0
-        cls.res2 = res10_sas + res10_sash0 #concatenate
+        self.res2 = res10_sas + res10_sash0 #concatenate
 
-        cls.res_string = '''\
+        self.res_string = '''\
                   Simple Kappa Coefficient
               --------------------------------
               Kappa                     0.4842
@@ -151,18 +117,16 @@ class TestUnweightedCohens(CheckCohens):
         kappa = cohens_kappa(table10, return_results=False)
         assert_almost_equal(kappa, self.res2[0], decimal=4)
 
-
 class TestWeightedCohens(CheckCohens):
     #comparison to printout of a SAS example
-    @classmethod
-    def setup_class(cls):
+    def __init__(self):
         #temporary: res instance is at last position
-        cls.res = cohens_kappa(table10, weights=[0, 1, 2])
+        self.res = cohens_kappa(table10, weights=[0, 1, 2])
         res10w_sas = [0.4701, 0.1457, 0.1845, 0.7558]
         res10w_sash0 = [0.1426, 3.2971, 0.0005, 0.0010]  #for test H0:kappa=0
-        cls.res2 = res10w_sas + res10w_sash0 #concatenate
+        self.res2 = res10w_sas + res10w_sash0 #concatenate
 
-        cls.res_string = '''\
+        self.res_string = '''\
                   Weighted Kappa Coefficient
               --------------------------------
               Kappa                     0.4701
@@ -350,3 +314,10 @@ def test_aggregate_raters():
     resf = aggregate_raters(data)
     colsum = np.array([26, 26, 30, 55, 43])
     assert_equal(resf[0].sum(0), colsum)
+
+
+if __name__ == '__main__':
+    import nose
+    nose.runmodule(argv=[__file__, '-vvs', '-x'#, '--pdb-failures'
+                        ], exit=False)
+

@@ -2,7 +2,8 @@
 
 Author: josef-pktd
 '''
-from statsmodels.compat.python import lmap
+from __future__ import print_function
+from statsmodels.compat.python import range, lmap
 import numpy as np
 
 def prob_bv_rectangle(lower, upper, cdf):
@@ -139,3 +140,6 @@ if __name__ == '__main__':
     arr3b = np.array([[ 0.25,  0.25,  0.25,  0.25]])
     arr3a = prob_quantize_cdf(np.linspace(0,1,2), np.linspace(0,1,5), unif_2d)
     assert_almost_equal(arr3a, arr3b, 14)
+
+
+

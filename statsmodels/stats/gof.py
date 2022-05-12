@@ -17,18 +17,18 @@ changes
 2013-02-25 : add chisquare_power, effectsize and "value"
 
 '''
-from statsmodels.compat.python import lrange
+from statsmodels.compat.python import range, lrange, string_types
 import numpy as np
 from scipy import stats
 
 
 # copied from regression/stats.utils
 def powerdiscrepancy(observed, expected, lambd=0.0, axis=0, ddof=0):
-    r"""Calculates power discrepancy, a class of goodness-of-fit tests
+    """Calculates power discrepancy, a class of goodness-of-fit tests
     as a measure of discrepancy between observed and expected data.
 
     This contains several goodness-of-fit tests as special cases, see the
-    description of lambd, the exponent of the power discrepancy. The pvalue
+    describtion of lambd, the exponent of the power discrepancy. The pvalue
     is based on the asymptotic chi-square distribution of the test statistic.
 
     freeman_tukey:
@@ -40,7 +40,7 @@ def powerdiscrepancy(observed, expected, lambd=0.0, axis=0, ddof=0):
         Observed values
     e : Iterable
         Expected values
-    lambd : {float, str}
+    lambd : float or string
         * float : exponent `a` for power discrepancy
         * 'loglikeratio': a = 0
         * 'freeman_tukey': a = -0.5
@@ -111,27 +111,24 @@ def powerdiscrepancy(observed, expected, lambd=0.0, axis=0, ddof=0):
     (array([[ 2.89714546,  5.79429093]]), array([[ 0.57518277,  0.21504648]]))
     >>> powerdiscrepancy(np.column_stack((observed,2*observed)), np.column_stack((10*expected,20*expected)), lambd=-1, axis=0)
     (array([[ 2.77258872,  5.54517744]]), array([[ 0.59657359,  0.2357868 ]]))
+
+
     """
     o = np.array(observed)
     e = np.array(expected)
 
-    if not isinstance(lambd, str):
+    if not isinstance(lambd, string_types):
         a = lambd
     else:
-        if lambd == 'loglikeratio':
-            a = 0
-        elif lambd == 'freeman_tukey':
-            a = -0.5
-        elif lambd == 'pearson':
-            a = 1
-        elif lambd == 'modified_loglikeratio':
-            a = -1
-        elif lambd == 'cressie_read':
-            a = 2/3.0
+        if   lambd == 'loglikeratio': a = 0
+        elif lambd == 'freeman_tukey': a = -0.5
+        elif lambd == 'pearson': a = 1
+        elif lambd == 'modified_loglikeratio': a = -1
+        elif lambd == 'cressie_read': a = 2/3.0
         else:
-            raise ValueError('lambd has to be a number or one of '
-                             'loglikeratio, freeman_tukey, pearson, '
-                             'modified_loglikeratio or cressie_read')
+            raise ValueError('lambd has to be a number or one of ' + \
+                    'loglikeratio, freeman_tukey, pearson, ' +\
+                    'modified_loglikeratio or cressie_read')
 
     n = np.sum(o, axis=axis)
     nt = n
@@ -150,12 +147,12 @@ def powerdiscrepancy(observed, expected, lambd=0.0, axis=0, ddof=0):
         p = e
         e = nt * e
     else:
-        raise ValueError('observed and expected need to have the same '
-                         'number of observations, or e needs to add to 1')
+        raise ValueError('observed and expected need to have the same ' +\
+                          'number of observations, or e needs to add to 1')
     k = o.shape[axis]
     if e.shape[axis] != k:
-        raise ValueError('observed and expected need to have the same '
-                         'number of bins')
+        raise ValueError('observed and expected need to have the same ' +\
+                          'number of bins')
 
     # Note: taken from formulas, to simplify cancel n
     if a == 0:   # log likelihood ratio
@@ -177,7 +174,7 @@ def gof_chisquare_discrete(distfn, arg, rvs, alpha, msg):
 
     Parameters
     ----------
-    distname : str
+    distname : string
         name of distribution function
     arg : sequence
         parameters of distribution
@@ -217,7 +214,7 @@ def gof_chisquare_discrete(distfn, arg, rvs, alpha, msg):
     distmass = []
     for ii in distsupport:
         current = distfn.cdf(ii,*arg)
-        if current - last >= wsupp-1e-14:
+        if  current - last >= wsupp-1e-14:
             distsupp.append(ii)
             distmass.append(current - last)
             last = current
@@ -248,23 +245,23 @@ def gof_binning_discrete(rvs, distfn, arg, nsupp=20):
 
     Parameters
     ----------
-    rvs : ndarray
+    rvs : array
         sample data
-    distname : str
+    distname : string
         name of distribution function
     arg : sequence
         parameters of distribution
-    nsupp : int
+    nsupp : integer
         number of bins. The algorithm tries to find bins with equal weights.
         depending on the distribution, the actual number of bins can be smaller.
 
     Returns
     -------
-    freq : ndarray
+    freq : array
         empirical frequencies for sample; not normalized, adds up to sample size
-    expfreq : ndarray
+    expfreq : array
         theoretical frequencies according to distribution
-    histsupp : ndarray
+    histsupp : array
         bin boundaries for histogram, (added 1e-8 for numerical robustness)
 
     Notes
@@ -303,7 +300,7 @@ def gof_binning_discrete(rvs, distfn, arg, nsupp=20):
     distmass = []
     for ii in distsupport:
         current = distfn.cdf(ii,*arg)
-        if current - last >= wsupp-1e-14:
+        if  current - last >= wsupp-1e-14:
             distsupp.append(ii)
             distmass.append(current - last)
             last = current
@@ -450,7 +447,7 @@ def chisquare_effectsize(probs0, probs1, correction=None, cohen=True, axis=0):
         and broadcast in the other dimensions
         Both probs0 and probs1 are normalized to add to one (in the ``axis``
         dimension).
-    correction : None or tuple
+    correction : None or tuple (nobs, df)
         If None, then the effect size is the chisquare statistic divide by
         the number of observations.
         If the correction is a tuple (nobs, df), then the effectsize is

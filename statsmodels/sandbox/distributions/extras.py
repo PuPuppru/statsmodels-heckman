@@ -13,8 +13,8 @@
 
 TODO:
 * Where is Transf_gen for general monotonic transformation ? found and added it
-* write some docstrings, some parts I do not remember
-* add Box-Cox transformation, parametrized ?
+* write some docstrings, some parts I don't remember
+* add Box-Cox transformation, parameterized ?
 
 
 this is only partially cleaned, still includes test examples as functions
@@ -50,25 +50,14 @@ License: BSD
 
 '''
 
-import numpy as np
-from numpy import poly1d,sqrt, exp
-
-import scipy
-from scipy import stats, special
-from scipy.stats import distributions
-
-from statsmodels.stats.moment_helpers import mvsk2mc, mc2mvsk
-
-try:
-    from scipy.stats._mvn import mvndst
-except ImportError:
-    # Must be using SciPy <1.8.0 where this function was moved (it's not a
-    # public SciPy function, but we need it here)
-    from scipy.stats.mvn import mvndst
-
-
 #note copied from distr_skewnorm_0.py
 
+from __future__ import print_function
+from statsmodels.compat.python import range, iteritems
+from scipy import stats, special, integrate  # integrate is for scipy 0.6.0 ???
+from scipy.stats import distributions
+from statsmodels.stats.moment_helpers import mvsk2mc, mc2mvsk
+import numpy as np
 
 class SkewNorm_gen(distributions.rv_continuous):
     '''univariate Skew-Normal distribution of Azzalini
@@ -219,6 +208,8 @@ appears in J.Roy.Statist.Soc, series B, vol.65, pp.367-389
 ##    return (mc, mc2, mc3, mc4)
 
 
+from numpy import poly1d,sqrt, exp
+import scipy
 def _hermnorm(N):
     # return the negatively normalized hermite polynomials up to order N-1
     #  (inclusive)
@@ -237,6 +228,7 @@ def pdf_moments_st(cnt):
 
     version of scipy.stats, any changes ?
     the scipy.stats version has a bug and returns normal distribution
+
     """
 
     N = len(cnt)
@@ -306,7 +298,7 @@ def pdf_mvsk(mvsk):
 
     References
     ----------
-    https://en.wikipedia.org/wiki/Edgeworth_series
+    http://en.wikipedia.org/wiki/Edgeworth_series
     Johnson N.L., S. Kotz, N. Balakrishnan: Continuous Univariate
     Distributions, Volume 1, 2nd ed., p.30
     """
@@ -354,7 +346,7 @@ def pdf_moments(cnt):
 
     References
     ----------
-    https://en.wikipedia.org/wiki/Edgeworth_series
+    http://en.wikipedia.org/wiki/Edgeworth_series
     Johnson N.L., S. Kotz, N. Balakrishnan: Continuous Univariate
     Distributions, Volume 1, 2nd ed., p.30
     """
@@ -419,7 +411,7 @@ class NormExpan_gen(distributions.rv_continuous):
         where xc = (x-mu)/sig is the standardized value of the random variable
         and H(xc,3) and H(xc,4) are Hermite polynomials
 
-        Note: This distribution has to be parametrized during
+        Note: This distribution has to be parameterized during
         initialization and instantiation, and does not have a shape
         parameter after instantiation (similar to frozen distribution
         except for location and scale.) Location and scale can be used
@@ -496,10 +488,15 @@ License: BSD
 
 '''
 
+from scipy import integrate # for scipy 0.6.0
+
+from scipy import stats, info
+from scipy.stats import distributions
+
 
 def get_u_argskwargs(**kwargs):
     #Todo: What's this? wrong spacing, used in Transf_gen TransfTwo_gen
-    u_kwargs = dict((k.replace('u_','',1),v) for k,v in kwargs.items()
+    u_kwargs = dict((k.replace('u_','',1),v) for k,v in iteritems(kwargs)
                     if k.startswith('u_'))
     u_args = u_kwargs.pop('u_args',None)
     return u_args, u_kwargs
@@ -529,8 +526,8 @@ class Transf_gen(distributions.rv_continuous):
 
 
         self.u_args, self.u_kwargs = get_u_argskwargs(**kwargs)
-        self.kls = kls  #(self.u_args, self.u_kwargs)
-                        # possible to freeze the underlying distribution
+        self.kls = kls   #(self.u_args, self.u_kwargs)
+                         # possible to freeze the underlying distribution
 
         super(Transf_gen,self).__init__(a=a, b=b, name = name,
                                 longname = longname, extradoc = extradoc)
@@ -586,6 +583,9 @@ loggammaexpg = Transf_gen(stats.gamma, np.log, np.exp, numargs=1)
 random variable
 
 '''
+from scipy import stats
+from scipy.stats import distributions
+import numpy as np
 
 class ExpTransf_gen(distributions.rv_continuous):
     '''Distribution based on log/exp transformation
@@ -731,19 +731,22 @@ class TransfTwo_gen(distributions.rv_continuous):
 
 
         self.u_args, self.u_kwargs = get_u_argskwargs(**kwargs)
-        self.kls = kls  #(self.u_args, self.u_kwargs)
-                        # possible to freeze the underlying distribution
+        self.kls = kls   #(self.u_args, self.u_kwargs)
+                         # possible to freeze the underlying distribution
 
         super(TransfTwo_gen,self).__init__(a=a, b=b, name = name,
                                 shapes = kls.shapes,
                                 longname = longname, extradoc = extradoc)
 
         # add enough info for self.freeze() to be able to reconstruct the instance
-        self._ctor_param.update(
-            dict(kls=kls, func=func, funcinvplus=funcinvplus,
-                 funcinvminus=funcinvminus, derivplus=derivplus,
-                 derivminus=derivminus, shape=self.shape)
-        )
+        try:
+            self._ctor_param.update(dict(kls=kls, func=func,
+                    funcinvplus=funcinvplus, funcinvminus=funcinvminus,
+                    derivplus=derivplus, derivminus=derivminus,
+                    shape=self.shape))
+        except AttributeError:
+            # scipy < 0.14 does not have this, ignore and do nothing
+            pass
 
     def _rvs(self, *args):
         self.kls._size = self._size   #size attached to self, not function argument
@@ -792,11 +795,11 @@ class TransfTwo_gen(distributions.rv_continuous):
 
 #TODO: rename these functions to have unique names
 
-class SquareFunc:
+class SquareFunc(object):
     '''class to hold quadratic function with inverse function and derivative
 
     using instance methods instead of class methods, if we want extension
-    to parametrized function
+    to parameterized function
     '''
     def inverseplus(self, x):
         return np.sqrt(x)
@@ -878,7 +881,7 @@ absnormalg = TransfTwo_gen(stats.norm, np.abs, inverseplus, inverseminus,
 
 #copied from mvncdf.py
 '''multivariate normal probabilities and cumulative distribution function
-a wrapper for scipy.stats._mvn.mvndst
+a wrapper for scipy.stats.kde.mvndst
 
 
       SUBROUTINE MVNDST( N, LOWER, UPPER, INFIN, CORREL, MAXPTS,
@@ -907,7 +910,7 @@ a wrapper for scipy.stats._mvn.mvndst
 *     CORREL REAL, array of correlation coefficients; the correlation
 *            coefficient in row I column J of the correlation matrix
 *            should be stored in CORREL( J + ((I-2)*(I-1))/2 ), for J < I.
-*            The correlation matrix must be positive semidefinite.
+*            THe correlation matrix must be positive semidefinite.
 *     MAXPTS INTEGER, maximum number of function values allowed. This
 *            parameter can be used to limit the time. A sensible
 *            strategy is to start with MAXPTS = 1000*N, and then
@@ -926,36 +929,37 @@ a wrapper for scipy.stats._mvn.mvndst
 
 
 
->>> mvndst([0.0,0.0],[10.0,10.0],[0,0],[0.5])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[10.0,10.0],[0,0],[0.5])
 (2e-016, 1.0, 0)
->>> mvndst([0.0,0.0],[100.0,100.0],[0,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[100.0,100.0],[0,0],[0.0])
 (2e-016, 1.0, 0)
->>> mvndst([0.0,0.0],[1.0,1.0],[0,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[1.0,1.0],[0,0],[0.0])
 (2e-016, 0.70786098173714096, 0)
->>> mvndst([0.0,0.0],[0.001,1.0],[0,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.001,1.0],[0,0],[0.0])
 (2e-016, 0.42100802096993045, 0)
->>> mvndst([0.0,0.0],[0.001,10.0],[0,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.001,10.0],[0,0],[0.0])
 (2e-016, 0.50039894221391101, 0)
->>> mvndst([0.0,0.0],[0.001,100.0],[0,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.001,100.0],[0,0],[0.0])
 (2e-016, 0.50039894221391101, 0)
->>> mvndst([0.0,0.0],[0.01,100.0],[0,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.01,100.0],[0,0],[0.0])
 (2e-016, 0.5039893563146316, 0)
->>> mvndst([0.0,0.0],[0.1,100.0],[0,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.1,100.0],[0,0],[0.0])
 (2e-016, 0.53982783727702899, 0)
->>> mvndst([0.0,0.0],[0.1,100.0],[2,2],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.1,100.0],[2,2],[0.0])
 (2e-016, 0.019913918638514494, 0)
->>> mvndst([0.0,0.0],[0.0,0.0],[0,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.0,0.0],[0,0],[0.0])
 (2e-016, 0.25, 0)
->>> mvndst([0.0,0.0],[0.0,0.0],[-1,0],[0.0])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.0,0.0],[-1,0],[0.0])
 (2e-016, 0.5, 0)
->>> mvndst([0.0,0.0],[0.0,0.0],[-1,0],[0.5])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.0,0.0],[-1,0],[0.5])
 (2e-016, 0.5, 0)
->>> mvndst([0.0,0.0],[0.0,0.0],[0,0],[0.5])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.0,0.0],[0,0],[0.5])
 (2e-016, 0.33333333333333337, 0)
->>> mvndst([0.0,0.0],[0.0,0.0],[0,0],[0.99])
+>>> scipy.stats.kde.mvn.mvndst([0.0,0.0],[0.0,0.0],[0,0],[0.99])
 (2e-016, 0.47747329317779391, 0)
 '''
 
+#from scipy.stats import kde
 
 informcode = {0: 'normal completion with ERROR < EPS',
               1: '''completion with ERROR > EPS and MAXPTS function values used;
@@ -965,7 +969,7 @@ informcode = {0: 'normal completion with ERROR < EPS',
 def mvstdnormcdf(lower, upper, corrcoef, **kwds):
     '''standardized multivariate normal cumulative distribution function
 
-    This is a wrapper for scipy.stats._mvn.mvndst which calculates
+    This is a wrapper for scipy.stats.kde.mvn.mvndst which calculates
     a rectangular integral over a standardized multivariate normal
     distribution.
 
@@ -1026,7 +1030,7 @@ def mvstdnormcdf(lower, upper, corrcoef, **kwds):
 
     '''
     n = len(lower)
-    #do not know if converting to array is necessary,
+    #don't know if converting to array is necessary,
     #but it makes ndim check possible
     lower = np.array(lower)
     upper = np.array(upper)
@@ -1053,7 +1057,7 @@ def mvstdnormcdf(lower, upper, corrcoef, **kwds):
     else:
         raise ValueError('corrcoef has incorrect dimension')
 
-    if 'maxpts' not in kwds:
+    if not 'maxpts' in kwds:
         if n >2:
             kwds['maxpts'] = 10000*n
 
@@ -1073,7 +1077,7 @@ def mvstdnormcdf(lower, upper, corrcoef, **kwds):
     #print lower,',',upper,',',infin,',',correl
     #print correl.shape
     #print kwds.items()
-    error, cdfvalue, inform = mvndst(lower,upper,infin,correl,**kwds)
+    error, cdfvalue, inform = scipy.stats.kde.mvn.mvndst(lower,upper,infin,correl,**kwds)
     if inform:
         print('something wrong', informcode[inform], error)
     return cdfvalue
@@ -1082,7 +1086,7 @@ def mvstdnormcdf(lower, upper, corrcoef, **kwds):
 def mvnormcdf(upper, mu, cov, lower=None,  **kwds):
     '''multivariate normal cumulative distribution function
 
-    This is a wrapper for scipy.stats._mvn.mvndst which calculates
+    This is a wrapper for scipy.stats.kde.mvn.mvndst which calculates
     a rectangular integral over a multivariate normal distribution.
 
     Parameters
@@ -1135,3 +1139,9 @@ def mvnormcdf(upper, mu, cov, lower=None,  **kwds):
     #v/np.sqrt(np.atleast_2d(np.diag(covv)))/np.sqrt(np.atleast_2d(np.diag(covv))).T
 
     return mvstdnormcdf(lower, upper, corr, **kwds)
+
+
+
+
+if __name__ == '__main__':
+    examples_transf()

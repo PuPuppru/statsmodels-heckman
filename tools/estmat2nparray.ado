@@ -12,7 +12,7 @@
 * add estimation results from e(), e(scalars) and e(macros), not the matrices in e
 * make estimation result optional
 * add aliases for params_table
-* do not split col or row names if only 1 - changed my mind: always list
+* don't split col or row names if only 1 - changed my mind: always list
 
 * Issues
 * ------
@@ -50,7 +50,10 @@ program define estmat2nparray
     foreach mat of local namelist {
         mkarray `mat' `myfile' `format'
     }
-    file write `myfile' "from statsmodels.tools.tools import Bunch" _n
+    file write `myfile' "class Bunch(dict):" _n
+    file write `myfile' "    def __init__(self, **kw):" _n
+    file write `myfile' "        dict.__init__(self, kw)" _n
+    file write `myfile' "        self.__dict__  = self" _n _n
 
 	if "`noest'" == "" {
 		file write `myfile' "        for i,att in enumerate(['params', 'bse', 'tvalues', 'pvalues']):" _n

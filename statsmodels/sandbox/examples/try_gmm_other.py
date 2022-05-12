@@ -4,12 +4,14 @@ from scipy import stats
 
 from statsmodels.regression.linear_model import OLS
 from statsmodels.tools import tools
-from statsmodels.sandbox.regression.gmm import spec_hausman
+from statsmodels.sandbox.regression.gmm import IV2SLS, IVGMM, DistQuantilesGMM, spec_hausman
 
 from statsmodels.sandbox.regression import gmm
 
 
+
 if __name__ == '__main__':
+    import statsmodels.api as sm
     examples = ['ivols', 'distquant'][:]
 
     if 'ivols' in examples:
@@ -118,7 +120,7 @@ if __name__ == '__main__':
         x0p = [1., gparrvs.min()-5, 1]
 
         moddist = gmm.DistQuantilesGMM(gparrvs, None, None, distfn=stats.genpareto)
-        #produces non-sense because optimal weighting matrix calculations do not
+        #produces non-sense because optimal weighting matrix calculations don't
         #apply to this case
         #resgp = moddist.fit() #now with 'cov': LinAlgError: Singular matrix
         pit1, wit1 = moddist.fititer([1.5,0,1.5], maxiter=1)
@@ -137,3 +139,4 @@ if __name__ == '__main__':
         print(res1b.params)
         print(res1b.bse)  #they look much too large
         print(np.sqrt(np.diag(res1b._cov_params)))
+

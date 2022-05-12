@@ -3,28 +3,28 @@
 Created on Sat Apr 16 15:02:13 2011
 @author: Josef Perktold
 """
+
 import numpy as np
-from numpy.testing import assert_almost_equal,  assert_allclose
+from numpy.testing import assert_almost_equal, assert_array_almost_equal
 
 from statsmodels.sandbox.distributions.multivariate import (
-    mvstdtprob, mvstdnormcdf)
+                mvstdtprob, mvstdnormcdf)
 from statsmodels.sandbox.distributions.mv_normal import MVT, MVNormal
 
-
-class Test_MVN_MVT_prob:
+class Test_MVN_MVT_prob(object):
     #test for block integratal, cdf, of multivariate t and normal
     #comparison results from R
 
-    @classmethod
-    def setup_class(cls):
-        cls.corr_equal = np.asarray([[1.0, 0.5, 0.5],[0.5,1,0.5],[0.5,0.5,1]])
-        cls.a = -1 * np.ones(3)
-        cls.b = 3 * np.ones(3)
-        cls.df = 4
+    def __init__(self):
+        self.corr_equal = np.asarray([[1.0, 0.5, 0.5],[0.5,1,0.5],[0.5,0.5,1]])
+        self.a = -1 * np.ones(3)
+        self.b = 3 * np.ones(3)
+        self.df = 4
 
-        corr2 = cls.corr_equal.copy()
+        corr2 = self.corr_equal.copy()
         corr2[2,1] = -0.5
-        cls.corr2 = corr2
+        self.corr2 = corr2
+
 
     def test_mvn_mvt_1(self):
         a, b = self.a, self.b
@@ -62,17 +62,15 @@ class Test_MVN_MVT_prob:
         df = self.df
         corr2 = self.corr2
 
+        #from -inf
+        #print 'from -inf'
         a2 = a.copy()
         a2[:] = -np.inf
-        # using higher precision in R, error approx. 6.866163e-07
-        probmvn_R = 0.9961141
-        # using higher precision in R, error approx. 1.6e-07
-        probmvt_R = 0.9522146
-        quadkwds = {'epsabs': 1e-08}
-        probmvt = mvstdtprob(a2, b, corr2, df, quadkwds=quadkwds)
-        assert_allclose(probmvt_R, probmvt, atol=5e-4)
-        probmvn = mvstdnormcdf(a2, b, corr2, maxpts=100000, abseps=1e-5)
-        assert_allclose(probmvn_R, probmvn, atol=1e-4)
+        probmvn_R = 0.9961141 #using higher precision in R, error approx. 6.866163e-07
+        probmvt_R = 0.9522146 #using higher precision in R, error approx. 1.6e-07
+        assert_almost_equal(probmvt_R, mvstdtprob(a2, b, corr2, df), 4)
+        assert_almost_equal(probmvn_R, mvstdnormcdf(a2, b, corr2, maxpts=100000,
+                                                    abseps=1e-5), 4)
 
     def test_mvn_mvt_4(self):
         a, bl = self.a, self.b
@@ -105,76 +103,72 @@ class Test_MVN_MVT_prob:
                                                 maxpts=100000, abseps=1e-5), 4)
 
 
-class TestMVDistributions:
+class TestMVDistributions(object):
     #this is not well organized
 
-    @classmethod
-    def setup_class(cls):
+    def __init__(self):
         covx = np.array([[1.0, 0.5], [0.5, 1.0]])
         mu3 = [-1, 0., 2.]
         cov3 = np.array([[ 1.  ,  0.5 ,  0.75],
                          [ 0.5 ,  1.5 ,  0.6 ],
                          [ 0.75,  0.6 ,  2.  ]])
-        cls.mu3 = mu3
-        cls.cov3 = cov3
+        self.mu3 = mu3
+        self.cov3 = cov3
 
         mvn3 = MVNormal(mu3, cov3)
         mvn3c = MVNormal(np.array([0,0,0]), cov3)
-        cls.mvn3 = mvn3
-        cls.mvn3c = mvn3c
+        self.mvn3 = mvn3
+        self.mvn3c = mvn3c
+
 
     def test_mvn_pdf(self):
         cov3 = self.cov3
         mvn3 = self.mvn3
+        mvn3c = self.mvn3c
 
-        r_val = [
-            -7.667977543898155, -6.917977543898155, -5.167977543898155
-        ]
-        assert_allclose(mvn3.logpdf(cov3), r_val, rtol=1e-13)
+        r_val = [-7.667977543898155, -6.917977543898155, -5.167977543898155]
+        assert_array_almost_equal( mvn3.logpdf(cov3), r_val, decimal = 14)
+        #decimal 18
+        r_val = [0.000467562492721686, 0.000989829804859273, 0.005696077243833402]
+        assert_array_almost_equal( mvn3.pdf(cov3), r_val, decimal = 17)
+        #cheating new mean, same cov, too dangerous, got wrong instance in tests
+        #mvn3.mean = np.array([0,0,0])
+        mvn3b = MVNormal(np.array([0,0,0]), cov3)
+        r_val = [0.02914269740502042, 0.02269635555984291, 0.01767593948287269]
+        assert_array_almost_equal( mvn3b.pdf(cov3), r_val, decimal = 16)
 
-        r_val = [
-            0.000467562492721686, 0.000989829804859273, 0.005696077243833402
-        ]
-        assert_allclose(mvn3.pdf(cov3), r_val, rtol=1e-13)
-
-        mvn3b = MVNormal(np.array([0, 0, 0]), cov3)
-        r_val = [
-            0.02914269740502042, 0.02269635555984291, 0.01767593948287269
-        ]
-        assert_allclose(mvn3b.pdf(cov3), r_val, rtol=1e-13)
-
-    def test_mvt_pdf(self, reset_randomstate):
+    def test_mvt_pdf(self):
         cov3 = self.cov3
         mu3 = self.mu3
 
-        mvt = MVT((0, 0), 1, 5)
-        assert_almost_equal(mvt.logpdf(np.array([0., 0.])), -1.837877066409345,
+        mvt = MVT((0,0), 1, 5)
+        assert_almost_equal(mvt.logpdf(np.array([0.,0.])), -1.837877066409345,
                             decimal=15)
-        assert_almost_equal(mvt.pdf(np.array([0., 0.])), 0.1591549430918953,
+        assert_almost_equal(mvt.pdf(np.array([0.,0.])), 0.1591549430918953,
                             decimal=15)
 
-        mvt.logpdf(np.array([1., 1.])) - (-3.01552989458359)
+        mvt.logpdf(np.array([1.,1.]))-(-3.01552989458359)
 
-        mvt1 = MVT((0, 0), 1, 1)
-        mvt1.logpdf(np.array([1., 1.])) - (-3.48579549941151)  # decimal=16
+        mvt1 = MVT((0,0), 1, 1)
+        mvt1.logpdf(np.array([1.,1.]))-(-3.48579549941151) #decimal=16
 
         rvs = mvt.rvs(100000)
-        assert_almost_equal(np.cov(rvs, rowvar=False), mvt.cov, decimal=1)
+        assert_almost_equal(np.cov(rvs, rowvar=0), mvt.cov, decimal=1)
 
         mvt31 = MVT(mu3, cov3, 1)
         assert_almost_equal(mvt31.pdf(cov3),
-                            [0.0007276818698165781, 0.0009980625182293658,
-                             0.0027661422056214652],
-                            decimal=17)
+            [0.0007276818698165781, 0.0009980625182293658, 0.0027661422056214652],
+            decimal=17)
 
         mvt = MVT(mu3, cov3, 3)
         assert_almost_equal(mvt.pdf(cov3),
-                            [0.000863777424247410, 0.001277510788307594,
-                             0.004156314279452241],
-                            decimal=17)
+            [0.000863777424247410, 0.001277510788307594, 0.004156314279452241],
+            decimal=17)
 
 
 if __name__ == '__main__':
-    import pytest
+    import nose
+    nose.runmodule(argv=['__main__','-vvs','-x'],#,'--pdb', '--pdb-failure'],
+                   exit=False)
 
-    pytest.main([__file__, '-vvs', '-x', '--pdb'])
+    print('Done')

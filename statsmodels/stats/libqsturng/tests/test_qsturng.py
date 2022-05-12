@@ -2,30 +2,26 @@
 # This software is funded in part by NIH Grant P20 RR016454.
 
 """The 'handful' tests are intended to aid refactoring. The tests with the
-@pytest.mark..slow are empirical (test within error limits) and intended to more
+@dec.slow are empirical (test within error limits) and intended to more
 extensively ensure the stability and accuracy of the functions"""
 
-from statsmodels.compat.python import lzip, lmap
+from statsmodels.compat.python import iterkeys, lzip, lmap
 
-from numpy.testing import (
-    assert_equal,
-    assert_almost_equal, assert_array_almost_equal,
-    assert_raises)
+from numpy.testing import TestCase, rand, assert_, assert_equal, \
+    assert_almost_equal, assert_array_almost_equal, assert_array_equal, \
+    assert_approx_equal, assert_raises, run_module_suite, dec
 
 import numpy as np
-import pytest
 
-from statsmodels.stats.libqsturng import qsturng, psturng
-
+from statsmodels.stats.libqsturng import qsturng, psturng,p_keys,v_keys
 
 def read_ch(fname):
-    with open(fname, encoding="utf-8") as f:
+    with open(fname) as f:
         lines = f.readlines()
     ps,rs,vs,qs = lzip(*[L.split(',') for L in lines])
     return lmap(float, ps), lmap(float, rs),lmap(float, vs), lmap(float, qs)
 
-
-class TestQsturng:
+class test_qsturng(TestCase):
     def test_scalar(self):
         # scalar input -> scalar output
         assert_almost_equal(4.43645545899562, qsturng(.9,5,6), 5)
@@ -77,16 +73,15 @@ class TestQsturng:
         for p,r,v,q in cases:
             assert_almost_equal(q, qsturng(p,r,v), 5)
 
-    # TODO: do something with this?
     #remove from testsuite, used only for table generation and fails on
     #Debian S390, no idea why
-    @pytest.mark.skip
-    def test_all_to_tbl(self):
+    @dec.slow
+    def t_est_all_to_tbl(self):
         from statsmodels.stats.libqsturng.make_tbls import T,R
         ps, rs, vs, qs = [], [], [], []
         for p in T:
             for v in T[p]:
-                for r in R.keys():
+                for r in iterkeys(R):
                     ps.append(p)
                     vs.append(v)
                     rs.append(r)
@@ -121,7 +116,7 @@ class TestQsturng:
         for p,r,v,q in cases:
             assert_almost_equal(q, qsturng(p,r,v), 5)
 
-    @pytest.mark.slow
+    @dec.slow
     def test_10000_to_ch(self):
         import os
         curdir = os.path.dirname(os.path.abspath(__file__))
@@ -133,7 +128,7 @@ class TestQsturng:
         errors = np.abs(qs-qsturng(ps,rs,vs))/qs
         assert_equal(np.array([]), np.where(errors > .03)[0])
 
-class TestPsturng:
+class test_psturng(TestCase):
     def test_scalar(self):
         "scalar input -> scalar output"
         assert_almost_equal(.1, psturng(4.43645545899562,5,6), 5)
@@ -184,16 +179,21 @@ class TestPsturng:
         for p,r,v,q in cases:
             assert_almost_equal(1.-p, psturng(q,r,v), 5)
 
-    @pytest.mark.slow
-    def test_100_random_values(self, reset_randomstate):
+    @dec.slow
+    def test_100_random_values(self):
         n = 100
-        random_state = np.random.RandomState(12345)
-        ps = random_state.random_sample(n)*(.999 - .1) + .1
-        rs = random_state.randint(2, 101, n)
-        vs = random_state.random_sample(n)*998. + 2.
+        ps = np.random.random(n)*(.999 - .1) + .1
+        rs = np.random.random_integers(2, 100, n)
+        vs = np.random.random(n)*998. + 2.
         qs = qsturng(ps, rs, vs)
         estimates = psturng(qs, rs, vs)
         actuals = 1. - ps
         errors = estimates - actuals
 
         assert_equal(np.array([]), np.where(errors > 1e-5)[0])
+
+##     def test_more_exotic_stuff(self, level=3):
+##         something_obscure_and_expensive()
+
+if __name__ == '__main__':
+    run_module_suite()

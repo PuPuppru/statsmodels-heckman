@@ -23,13 +23,14 @@ I guess this is currently only for one sided test statistics, e.g. for
 two-sided tests basend on t or normal distribution use the absolute value.
 
 '''
+from __future__ import print_function
 from statsmodels.compat.python import lrange
 import numpy as np
 
 from statsmodels.iolib.table import SimpleTable
 
 #copied from stattools
-class StatTestMC:
+class StatTestMC(object):
     """class to run Monte Carlo study on a statistical test'''
 
     TODO
@@ -63,7 +64,7 @@ class StatTestMC:
        not be updated, and, therefore, not correspond to the same run.
 
     .. Warning::
-       Under Construction, do not expect stability in Api or implementation
+       Under Construction, don't expect stability in Api or implementation
 
 
     Examples
@@ -95,6 +96,8 @@ class StatTestMC:
     the results should be presented, e.g.
 
     print(mc1.cdf(crit, [1,2,3])[1]
+
+
     """
 
     def __init__(self, dgp, statistic):
@@ -141,10 +144,10 @@ class StatTestMC:
             #self.nreturn = nreturns = 1
             mcres = np.zeros(nrepl)
             mcres[0] = mcres0
-            for ii in range(1, nrepl-1, nreturns):
+            for ii in range(1, repl-1, nreturns):
                 x = dgp(*dgpargs) #(1e-4+np.random.randn(nobs)).cumsum()
                 #should I ravel?
-                mcres[ii] = statfun(x, *statsargs)
+                mcres[ii] = statfun(x, *statsargs) #unitroot_adf(x, 2,trendorder=0, autolag=None)
         #more than one return statistic
         else:
             self.nreturn = nreturns = len(statindices)
@@ -163,13 +166,13 @@ class StatTestMC:
 
         does not do any plotting
 
-        I do not remember what I wanted here, looks similar to the new cdf
+        I don't remember what I wanted here, looks similar to the new cdf
         method, but this also does a binned pdf (self.histo)
 
 
         '''
         if self.mcres.ndim == 2:
-            if idx is not None:
+            if  not idx is None:
                 mcres = self.mcres[:,idx]
             else:
                 raise ValueError('currently only 1 statistic at a time')
@@ -229,7 +232,7 @@ class StatTestMC:
         '''
 
         if self.mcres.ndim == 2:
-            if idx is not None:
+            if not idx is None:
                 mcres = self.mcres[:,idx]
             else:
                 raise ValueError('currently only 1 statistic at a time')
@@ -301,7 +304,7 @@ class StatTestMC:
             be used in the calculation
         distpdf : callable
             probability density function of reference distribution
-        bins : {int, array_like}
+        bins : integer or array_like
             used unchanged for matplotlibs hist call
         ax : TODO: not implemented yet
         kwds : None or tuple of dicts
@@ -318,7 +321,7 @@ class StatTestMC:
         if kwds is None:
             kwds = ({},{})
         if self.mcres.ndim == 2:
-            if idx is not None:
+            if not idx is None:
                 mcres = self.mcres[:,idx]
             else:
                 raise ValueError('currently only 1 statistic at a time')
@@ -329,7 +332,7 @@ class StatTestMC:
 
 
         import matplotlib.pyplot as plt
-        #I do not want to figure this out now
+        #I don't want to figure this out now
 #        if ax=None:
 #            fig = plt.figure()
 #            ax = fig.addaxis()
@@ -447,8 +450,10 @@ class StatTestMC:
 
 if __name__ == '__main__':
     from scipy import stats
+    from statsmodels.iolib.table import SimpleTable
 
-    from statsmodels.stats.diagnostic import acorr_ljungbox
+    from statsmodels.sandbox.stats.diagnostic import (
+                    acorr_ljungbox, unitroot_adf)
 
 
     def randwalksim(nobs=100, drift=0.0):
@@ -457,6 +462,9 @@ if __name__ == '__main__':
     def normalnoisesim(nobs=500, loc=0.0):
         return (loc+np.random.randn(nobs))
 
+    def adf20(x):
+        return unitroot_adf(x, 2,trendorder=0, autolag=None)
+
 #    print('\nResults with MC class'
 #    mc1 = StatTestMC(randwalksim, adf20)
 #    mc1.run(1000)
@@ -464,17 +472,18 @@ if __name__ == '__main__':
 #    print(mc1.quantiles()
 
     print('\nLjung Box')
+    from statsmodels.sandbox.stats.diagnostic import acorr_ljungbox
 
     def lb4(x):
-        s,p = acorr_ljungbox(x, lags=4, return_df=True)
+        s,p = acorr_ljungbox(x, lags=4)
         return s[-1], p[-1]
 
     def lb1(x):
-        s,p = acorr_ljungbox(x, lags=1, return_df=True)
+        s,p = acorr_ljungbox(x, lags=1)
         return s[0], p[0]
 
     def lb(x):
-        s,p = acorr_ljungbox(x, lags=4, return_df=True)
+        s,p = acorr_ljungbox(x, lags=4)
         return np.r_[s, p]
 
     print('Results with MC class')

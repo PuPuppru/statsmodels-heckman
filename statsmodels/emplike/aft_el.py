@@ -27,19 +27,17 @@ Statistics. 14:3, 643-656.
 
 
 """
-import warnings
+from __future__ import division
 
 import numpy as np
+from statsmodels.regression.linear_model import OLS, WLS
+from statsmodels.tools import add_constant
 #from elregress import ElReg
 from scipy import optimize
 from scipy.stats import chi2
-
-from statsmodels.regression.linear_model import OLS, WLS
-from statsmodels.tools import add_constant
-from statsmodels.tools.sm_exceptions import IterationLimitWarning
-
 from .descriptive import _OptFuncts
-
+import warnings
+from statsmodels.tools.sm_exceptions import IterationLimitWarning
 
 class OptAFT(_OptFuncts):
     """
@@ -56,6 +54,7 @@ class OptAFT(_OptFuncts):
     _EM_test:
         Uses the modified Em algorithm of Zhou 2005 to maximize the
         likelihood of a parameter vector.
+
     """
     def __init__(self):
         pass
@@ -74,9 +73,11 @@ class OptAFT(_OptFuncts):
 
         Returns
         -------
-        llr : float
+
+        llr: float
             -2 times the log likelihood of the nuisance parameters and the
             hypothesized value of the parameter(s) of interest.
+
         """
         test_params = test_vals.reshape(self.model.nvar, 1)
         est_vect = self.model.uncens_exog * (self.model.uncens_endog -
@@ -96,12 +97,12 @@ class OptAFT(_OptFuncts):
         Uses EM algorithm to compute the maximum likelihood of a test
 
         Parameters
-        ----------
+        ---------
 
-        nuisance_params : ndarray
+        Nuisance Params: array
             Vector of values to be used as nuisance params.
 
-        maxiter : int
+        maxiter: int
             Number of iterations in the EM algorithm for a parameter vector
 
         Returns
@@ -160,22 +161,23 @@ class OptAFT(_OptFuncts):
         parameter and some critical value.
 
         Parameters
-        ----------
+        ---------
         b0: float
             Value of a regression parameter
-        param_num : int
+
+        param_num: int
             Parameter index of b0
         """
         return self.test_beta([b0], [param_num])[0] - self.r0
 
 
-class emplikeAFT:
+class emplikeAFT(object):
     """
 
     Class for estimating and conducting inference in an AFT model.
 
     Parameters
-    ----------
+    ---------
 
     endog: nx1 array
         Response variables that are subject to random censoring
@@ -189,21 +191,29 @@ class emplikeAFT:
 
     Attributes
     ----------
-    nobs : float
+
+    nobs: float
         Number of observations
-    endog : ndarray
+
+    endog: array
         Endog attay
-    exog : ndarray
+
+    exog: array
         Exogenous variable matrix
+
     censors
         Censors array but sets the max(endog) to uncensored
-    nvar : float
+
+    nvar: float
         Number of exogenous variables
-    uncens_nobs : float
+
+    uncens_nobs: float
         Number of uncensored observations
-    uncens_endog : ndarray
+
+    uncens_endog: array
         Uncensored response variables
-    uncens_exog : ndarray
+
+    uncens_exog: array
         Exogenous variables of the uncensored observations
 
     Methods
@@ -228,7 +238,7 @@ class emplikeAFT:
         self.nobs = np.shape(exog)[0]
         self.endog = endog.reshape(self.nobs, 1)
         self.exog = exog.reshape(self.nobs, -1)
-        self.censors = np.asarray(censors).reshape(self.nobs, 1)
+        self.censors = censors.reshape(self.nobs, 1)
         self.nvar = self.exog.shape[1]
         idx = np.lexsort((-self.censors[:, 0], self.endog[:, 0]))
         self.endog = self.endog[idx]
@@ -248,14 +258,14 @@ class emplikeAFT:
 
         Parameters
         ----------
-        endog : ndarray
+        endog: array
             Models endogenous variable
-        censors : ndarray
+        censors: array
             arrat indicating a censored array
 
         Returns
         -------
-        indic_ties : ndarray
+        indic_ties: array
             ties[i]=1 if endog[i]==endog[i+1] and
             censors[i]=censors[i+1]
         """
@@ -278,6 +288,7 @@ class emplikeAFT:
             Indicates if the i'th observation is the same as the ith +1
         untied_km: 1d array
             Km estimates at each observation assuming no ties.
+
         """
         # TODO: Vectorize, even though it is only 1 pass through for any
         # function call
@@ -318,6 +329,7 @@ class emplikeAFT:
         This function makes calls to _is_tied and km_w_ties to handle ties in
         the data.If a censored observation and an uncensored observation has
         the same value, it is assumed that the uncensored happened first.
+
         """
         nobs = self.nobs
         num = (nobs - (np.arange(nobs) + 1.))
@@ -327,7 +339,7 @@ class emplikeAFT:
         km = np.cumprod(km)  # If no ties, this is kaplan-meier
         tied = self._is_tied(endog, censors)
         wtd_km = self._km_w_ties(tied, km)
-        return (censors / wtd_km).reshape(nobs, 1)
+        return  (censors / wtd_km).reshape(nobs, 1)
 
     def fit(self):
         """
@@ -335,7 +347,7 @@ class emplikeAFT:
         Fits an AFT model and returns results instance
 
         Parameters
-        ----------
+        ---------
         None
 
 
@@ -365,7 +377,7 @@ class AFTResults(OptAFT):
         Fits an AFT model and returns parameters.
 
         Parameters
-        ----------
+        ---------
         None
 
 
@@ -392,38 +404,42 @@ class AFTResults(OptAFT):
 
         Parameters
         ----------
-        b0_vals : list
+        b0_vals: list
             The value of parameters to be tested
-        param_num : list
+
+        param_num: list
             Which parameters to be tested
-        maxiter : int, optional
+
+        maxiter: int, optional
             How many iterations to use in the EM algorithm.  Default is 30
-        ftol : float, optional
+
+        ftol: float, optional
             The function tolerance for the EM optimization.
             Default is 10''**''-5
-        print_weights : bool
+
+        print_weights: bool
             If true, returns the weights tate maximize the profile
             log likelihood. Default is False
 
         Returns
         -------
 
-        test_results : tuple
+        test_results: tuple
             The log-likelihood and p-pvalue of the test.
 
         Notes
-        -----
+        ----
 
         The function will warn if the EM reaches the maxiter.  However, when
         optimizing over nuisance parameters, it is possible to reach a
         maximum number of inner iterations for a specific value for the
         nuisance parameters while the resultsof the function are still valid.
         This usually occurs when the optimization over the nuisance parameters
-        selects parameter values that yield a log-likihood ratio close to
+        selects paramater values that yield a log-likihood ratio close to
         infinity.
 
         Examples
-        --------
+        -------
 
         >>> import statsmodels.api as sm
         >>> import numpy as np
@@ -448,6 +464,7 @@ class AFTResults(OptAFT):
         >>> res = model.test_beta([0], [1])
         >>> res
         (4.623487775078047, 0.031537049752572731)
+
         """
         censors = self.model.censors
         endog = self.model.endog
@@ -496,18 +513,22 @@ class AFTResults(OptAFT):
         parameter in the AFT model.
 
         Parameters
-        ----------
-        param_num : int
+        ---------
+
+        param_num: int
             Parameter number of interest
-        beta_high : float
+
+        beta_high: float
             Upper bound for the confidence interval
-        beta_low : float
+
+        beta_low:
             Lower bound for the confidence interval
-        sig : float, optional
+
+        sig: float, optional
             Significance level.  Default is .05
 
         Notes
-        -----
+        ----
         If the function returns f(a) and f(b) must have different signs,
         consider widening the search area by adjusting beta_low and
         beta_high.
@@ -529,6 +550,7 @@ class AFTResults(OptAFT):
 
         If the user desires to verify the success of the optimization,
         it is recommended to test the limits using test_beta.
+
         """
         params = self.params()
         self.r0 = chi2.ppf(1 - sig, 1)

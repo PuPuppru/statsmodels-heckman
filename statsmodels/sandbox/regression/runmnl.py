@@ -22,12 +22,13 @@ Koppelman, Frank S., and Chandra Bhat with technical support from Vaneet Sethi,
 Author: josef-pktd
 License: BSD (simplified)
 '''
+
+from __future__ import print_function
+from statsmodels.compat.python import zip
 import numpy as np
 import numpy.lib.recfunctions as recf
-from scipy import optimize
 
-
-class TryCLogit:
+class TryCLogit(object):
     '''
     Conditional Logit, data handling test
 
@@ -93,7 +94,7 @@ class TryCLogit:
         xb = self.xbetas(params)
         expxb = np.exp(xb)
         sumexpxb = expxb.sum(1)#[:,None]
-        probs = expxb/expxb.sum(1)[:,None]  #we do not really need this for all
+        probs = expxb/expxb.sum(1)[:,None]  #we don't really need this for all
         loglike = (self.endog * np.log(probs)).sum(1)
         #is this the same: YES
         #self.logliketest = (self.endog * xb).sum(1) - np.log(sumexpxb)
@@ -106,11 +107,11 @@ class TryCLogit:
         return optimize.fmin(self.loglike, start_params, maxfun=10000)
 
 
-class TryNCLogit:
+class TryNCLogit(object):
     '''
     Nested Conditional Logit (RUNMNL), data handling test
 
-    unfinished, does not do anything yet
+    unfinished, doesn't do anything yet
 
     '''
 
@@ -153,22 +154,22 @@ class TryNCLogit:
         logsumexpxb = np.log(sumexpxb)
         #loglike = (self.endog * xb).sum(1) - logsumexpxb
         probs = expxb/sumexpxb[:,None]
-        return probs, logsumexpxp  # noqa:F821  See GH#5756
+        return probs, logsumexpxp
         #if self.endog where index then xb[self.endog]
         #return -loglike.sum()   #return sum for now not for each observation
 
     def loglike_branch(self, params, tau):
         #not yet sure how to keep track of branches during walking of tree
         ivs = []
-        for b in branches:  # noqa:F821  See GH#5756
-            probs, iv = self.loglike_leafbranch(params, tau)
+        for b in branches:
+            probs, iv = loglike_leafbranch(self, params, tau)
             ivs.append(iv)
 
         #ivs = np.array(ivs)   #note ivs is (nobs,nbranchchoices)
         ivs = np.column_stack(ivs) # this way ?
         exptiv = np.exp(tau*ivs)
         sumexptiv = exptiv.sum(1)
-        logsumexpxb = np.log(sumexpxb)  # noqa:F821  See GH#5756
+        logsumexpxb = np.log(sumexpxb)
         probs = exptiv/sumexptiv[:,None]
 
 
@@ -176,7 +177,7 @@ class TryNCLogit:
 ####### new in treewalkerclass.py, copy new version to replace this
 ####### problem with bzr I will disconnect history when copying
 testxb = 0 #global to class
-class RU2NMNL:
+class RU2NMNL(object):
     '''Nested Multinomial Logit with Random Utility 2 parameterization
 
     '''
@@ -240,10 +241,10 @@ class RU2NMNL:
 dta = np.genfromtxt('TableF23-2.txt', skip_header=1,
                     names='Mode   Ttme   Invc    Invt      GC     Hinc    PSize'.split())
 
-endog = dta['Mode'].reshape(-1,4).copy() #I do not want a view
+endog = dta['Mode'].reshape(-1,4).copy() #I don't want a view
 nobs, nchoices = endog.shape
 datafloat = dta.view(float).reshape(-1,7)
-exog = datafloat[:,1:].reshape(-1,6*nchoices).copy() #I do not want a view
+exog = datafloat[:,1:].reshape(-1,6*nchoices).copy() #I don't want a view
 
 print(endog.sum(0))
 varnames = dta.dtype.names
@@ -289,7 +290,7 @@ xivar = [['GC', 'Ttme', 'Const', 'Hinc'],
 xi = []
 for ii in range(4):
     xi.append(dta1[xivar[ii]][choice_index==ii])
-    #this does not change sequence of columns, bug report by Skipper I think
+    #this doesn't change sequence of columns, bug report by Skipper I think
 
 ncommon = 2
 betaind = [len(xi[ii].dtype.names)-ncommon for ii in range(4)]
@@ -311,6 +312,7 @@ betai = [beta[idx] for idx in betaindices]
 #get exogs as float
 xifloat = [xx.view(float).reshape(nobs,-1) for xx in xi]
 clogit = TryCLogit(endog, xifloat, 2)
+from scipy import optimize
 
 debug = 0
 if debug:
@@ -343,7 +345,8 @@ print(clogit.fit())
 tree0 = ('top',
             [('Fly',['Air']),
              ('Ground', ['Train', 'Car', 'Bus'])
-             ])
+             ]
+        )
 
 datadict = dict(zip(['Air', 'Train', 'Bus', 'Car'],
                     [xifloat[i]for i in range(4)]))

@@ -7,8 +7,7 @@ Notes
 Many of the functions are called x12. However, they are also intended to work
 for x13. If this is not the case, it's a bug.
 """
-from statsmodels.compat.pandas import deprecate_kwarg
-
+from __future__ import print_function
 import os
 import subprocess
 import tempfile
@@ -17,6 +16,7 @@ from warnings import warn
 
 import pandas as pd
 
+from statsmodels.compat.python import iteritems
 from statsmodels.tools.tools import Bunch
 from statsmodels.tools.sm_exceptions import (X13NotFoundError,
                                              IOWarning, X13Error,
@@ -24,8 +24,7 @@ from statsmodels.tools.sm_exceptions import (X13NotFoundError,
 
 __all__ = ["x13_arima_select_order", "x13_arima_analysis"]
 
-_binary_names = ('x13as.exe', 'x13as', 'x12a.exe', 'x12a',
-                 'x13as_ascii', 'x13as_html')
+_binary_names = ('x13as.exe', 'x13as', 'x12a.exe', 'x12a')
 
 
 class _freq_to_period:
@@ -34,15 +33,13 @@ class _freq_to_period:
             return 12
         elif key.startswith('Q'):
             return 4
-        elif key.startswith('W'):
-            return 52
 
 
 _freq_to_period = _freq_to_period()
 
-_period_to_freq = {12: 'M', 4: 'Q'}
-_log_to_x12 = {True: 'log', False: 'none', None: 'auto'}
-_bool_to_yes_no = lambda x: 'yes' if x else 'no'  # noqa:E731
+_period_to_freq = {12 : 'M', 4 : 'Q'}
+_log_to_x12 = {True : 'log', False : 'none', None : 'auto'}
+_bool_to_yes_no = lambda x : 'yes' if x else 'no'
 
 
 def _find_x12(x12path=None, prefer_x13=True):
@@ -95,11 +92,8 @@ def _clean_order(order):
     Takes something like (1 1 0)(0 1 1) and returns a arma order, sarma
     order tuple. Also accepts (1 1 0) and return arma order and (0, 0, 0)
     """
-    order = re.findall(r"\([0-9 ]*?\)", order)
-
-    def clean(x):
-        return tuple(map(int, re.sub("[()]", "", x).split(" ")))
-
+    order = re.findall("\([0-9 ]*?\)", order)
+    clean = lambda x : tuple(map(int, re.sub("[()]", "", x).split(" ")))
     if len(order) > 1:
         order, sorder = map(clean, order)
     else:
@@ -172,11 +166,11 @@ def _make_regression_options(trading, exog):
     return reg_spec
 
 
-def _make_forecast_options(forecast_periods):
-    if forecast_periods is None:
+def _make_forecast_options(forecast_years):
+    if forecast_years is None:
         return ""
     forecast_spec = "forecast{\n"
-    forecast_spec += "maxlead = ({0})\n}}\n".format(forecast_periods)
+    forecast_spec += "maxlead = ({0})\n}}\n".format(forecast_years)
     return forecast_spec
 
 
@@ -193,21 +187,20 @@ def _convert_out_to_series(x, dates, name):
     Convert x to a DataFrame where x is a string in the format given by
     x-13arima-seats output.
     """
-    from io import StringIO
-    from pandas import read_csv
-    out = read_csv(StringIO(x), skiprows=2,
-                   header=None, sep='\t', engine='python')
-    return out.set_index(dates).rename(columns={1: name})[name]
+    from statsmodels.compat import StringIO
+    from pandas import read_table
+    out = read_table(StringIO(x), skiprows=2, header=None)
+    return out.set_index(dates).rename(columns={1 : name})[name]
 
 
 def _open_and_read(fname):
     # opens a file, reads it, and make sure it's closed
-    with open(fname, 'r', encoding="utf-8") as fin:
+    with open(fname, 'r') as fin:
         fout = fin.read()
     return fout
 
 
-class Spec:
+class Spec(object):
     @property
     def spec_name(self):
         return self.__class__.__name__.replace("Spec", "")
@@ -222,9 +215,9 @@ class Spec:
 
     def set_options(self, **kwargs):
         options = ""
-        for key, value in kwargs.items():
+        for key, value in iteritems(kwargs):
             options += "{0}={1}\n".format(key, value)
-            self.__dict__.update({key: value})
+            self.__dict__.update({key : value})
         self.options = options
 
 
@@ -258,6 +251,7 @@ class SeriesSpec(Spec):
     missingval
     saveprecision
     trimzero
+
     """
     def __init__(self, data, name='Unnamed Series', appendbcst=False,
                  appendfcst=False,
@@ -317,10 +311,9 @@ def pandas_to_series_spec(x):
     return series_spec
 
 
-@deprecate_kwarg('forecast_years', 'forecast_periods')
 def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
                        exog=None, log=None, outlier=True, trading=False,
-                       forecast_periods=None, retspec=False,
+                       forecast_years=None, retspec=False,
                        speconly=False, start=None, freq=None,
                        print_stdout=False, x12path=None, prefer_x13=True):
     """
@@ -328,7 +321,7 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
 
     Parameters
     ----------
-    endog : array_like, pandas.Series
+    endog : array-like, pandas.Series
         The series to model. It is best to use a pandas object with a
         DatetimeIndex or PeriodIndex. However, you can pass an array-like
         object. If your object does not have a dates index then ``start`` and
@@ -337,7 +330,7 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
         The maximum order of the regular and seasonal ARMA polynomials to
         examine during the model identification. The order for the regular
         polynomial must be greater than zero and no larger than 4. The
-        order for the seasonal polynomial may be 1 or 2.
+        order for the seaonal polynomial may be 1 or 2.
     maxdiff : tuple
         The maximum orders for regular and seasonal differencing in the
         automatic differencing procedure. Acceptable inputs for regular
@@ -349,7 +342,7 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
         differencing. Regular differencing may be 0, 1, or 2. Seasonal
         differencing may be 0 or 1. ``maxdiff`` must be None, otherwise
         ``diff`` is ignored.
-    exog : array_like
+    exog : array-like
         Exogenous variables.
     log : bool or None
         If None, it is automatically determined whether to log the series or
@@ -358,8 +351,8 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
         Whether or not outliers are tested for and corrected, if detected.
     trading : bool
         Whether or not trading day effects are tested for.
-    forecast_periods : int
-        Number of forecasts produced. The default is None.
+    forecast_years : int
+        Number of forecasts produced. The default is one year.
     retspec : bool
         Whether to return the created specification file. Can be useful for
         debugging.
@@ -371,7 +364,7 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
         Anything accepted by pandas.DatetimeIndex for the start value.
     freq : str
         Must be givein if ``endog`` does not have date information in its
-        index. Anything accepted by pandas.DatetimeIndex for the freq value.
+        index. Anything accapted by pandas.DatetimeIndex for the freq value.
     print_stdout : bool
         The stdout from X12/X13 is suppressed. To print it out, set this
         to True. Default is False.
@@ -385,19 +378,20 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
         fallback to the X12PATH environmental variable. If x12path points
         to the path for the X12/X13 binary, it does nothing.
 
+
     Returns
     -------
-    Bunch
-        A bunch object containing the listed attributes.
+    res : Bunch
+        A bunch object with the following attributes:
 
         - results : str
           The full output from the X12/X13 run.
         - seasadj : pandas.Series
-          The final seasonally adjusted ``endog``.
+          The final seasonally adjusted ``endog``
         - trend : pandas.Series
-          The trend-cycle component of ``endog``.
+          The trend-cycle component of ``endog``
         - irregular : pandas.Series
-          The final irregular component of ``endog``.
+          The final irregular component of ``endog``
         - stdout : str
           The captured stdout produced by x12/x13.
         - spec : str, optional
@@ -428,7 +422,7 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
     options = _make_automdl_options(maxorder, maxdiff, diff)
     spec += "automdl{{{0}}}\n".format(options)
     spec += _make_regression_options(trading, exog)
-    spec += _make_forecast_options(forecast_periods)
+    spec += _make_forecast_options(forecast_years)
     spec += "x11{ save=(d11 d12 d13) }"
     if speconly:
         return spec
@@ -460,7 +454,7 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
             #   not sure why. no process should have these open
             os.remove(ftempin.name)
             os.remove(ftempout.name)
-        except OSError:
+        except:
             if os.path.exists(ftempin.name):
                 warn("Failed to delete resource {0}".format(ftempin.name),
                      IOWarning)
@@ -472,7 +466,7 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
     trend = _convert_out_to_series(trend, endog.index, 'trend')
     irregular = _convert_out_to_series(irregular, endog.index, 'irregular')
 
-    # NOTE: there is not likely anything in stdout that's not in results
+    # NOTE: there isn't likely anything in stdout that's not in results
     #       so may be safe to just suppress and remove it
     if not retspec:
         res = X13ArimaAnalysisResult(observed=endog, results=results,
@@ -486,18 +480,17 @@ def x13_arima_analysis(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
     return res
 
 
-@deprecate_kwarg('forecast_years', 'forecast_periods')
 def x13_arima_select_order(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
                            exog=None, log=None, outlier=True, trading=False,
-                           forecast_periods=None,
+                           forecast_years=None,
                            start=None, freq=None, print_stdout=False,
                            x12path=None, prefer_x13=True):
     """
-    Perform automatic seasonal ARIMA order identification using x12/x13 ARIMA.
+    Perform automatic seaonal ARIMA order identification using x12/x13 ARIMA.
 
     Parameters
     ----------
-    endog : array_like, pandas.Series
+    endog : array-like, pandas.Series
         The series to model. It is best to use a pandas object with a
         DatetimeIndex or PeriodIndex. However, you can pass an array-like
         object. If your object does not have a dates index then ``start`` and
@@ -506,7 +499,7 @@ def x13_arima_select_order(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
         The maximum order of the regular and seasonal ARMA polynomials to
         examine during the model identification. The order for the regular
         polynomial must be greater than zero and no larger than 4. The
-        order for the seasonal polynomial may be 1 or 2.
+        order for the seaonal polynomial may be 1 or 2.
     maxdiff : tuple
         The maximum orders for regular and seasonal differencing in the
         automatic differencing procedure. Acceptable inputs for regular
@@ -518,7 +511,7 @@ def x13_arima_select_order(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
         differencing. Regular differencing may be 0, 1, or 2. Seasonal
         differencing may be 0 or 1. ``maxdiff`` must be None, otherwise
         ``diff`` is ignored.
-    exog : array_like
+    exog : array-like
         Exogenous variables.
     log : bool or None
         If None, it is automatically determined whether to log the series or
@@ -527,14 +520,14 @@ def x13_arima_select_order(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
         Whether or not outliers are tested for and corrected, if detected.
     trading : bool
         Whether or not trading day effects are tested for.
-    forecast_periods : int
-        Number of forecasts produced. The default is None.
+    forecast_years : int
+        Number of forecasts produced. The default is one year.
     start : str, datetime
         Must be given if ``endog`` does not have date information in its index.
         Anything accepted by pandas.DatetimeIndex for the start value.
     freq : str
         Must be givein if ``endog`` does not have date information in its
-        index. Anything accepted by pandas.DatetimeIndex for the freq value.
+        index. Anything accapted by pandas.DatetimeIndex for the freq value.
     print_stdout : bool
         The stdout from X12/X13 is suppressed. To print it out, set this
         to True. Default is False.
@@ -550,19 +543,19 @@ def x13_arima_select_order(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
 
     Returns
     -------
-    Bunch
-        A bunch object containing the listed attributes.
+    results : Bunch
+        A bunch object that has the following attributes:
 
         - order : tuple
-          The regular order.
+          The regular order
         - sorder : tuple
-          The seasonal order.
+          The seasonal order
         - include_mean : bool
-          Whether to include a mean or not.
+          Whether to include a mean or not
         - results : str
-          The full results from the X12/X13 analysis.
+          The full results from the X12/X13 analysis
         - stdout : str
-          The captured stdout from the X12/X13 analysis.
+          The captured stdout from the X12/X13 analysis
 
     Notes
     -----
@@ -572,7 +565,7 @@ def x13_arima_select_order(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
     """
     results = x13_arima_analysis(endog, x12path=x12path, exog=exog, log=log,
                                  outlier=outlier, trading=trading,
-                                 forecast_periods=forecast_periods,
+                                 forecast_years=forecast_years,
                                  maxorder=maxorder, maxdiff=maxdiff, diff=diff,
                                  start=start, freq=freq, prefer_x13=prefer_x13)
     model = re.search("(?<=Final automatic model choice : ).*",
@@ -590,9 +583,9 @@ def x13_arima_select_order(endog, maxorder=(2, 1), maxdiff=(2, 1), diff=None,
     return res
 
 
-class X13ArimaAnalysisResult:
+class X13ArimaAnalysisResult(object):
     def __init__(self, **kwargs):
-        for key, value in kwargs.items():
+        for key, value in iteritems(kwargs):
             setattr(self, key, value)
 
     def plot(self):
@@ -610,3 +603,32 @@ class X13ArimaAnalysisResult:
 
         fig.tight_layout()
         return fig
+
+
+if __name__ == "__main__":
+    import numpy as np
+    from statsmodels.tsa.arima_process import ArmaProcess
+    np.random.seed(123)
+    ar = [1, .35, .8]
+    ma = [1, .8]
+    arma = ArmaProcess(ar, ma, nobs=100)
+    assert arma.isstationary()
+    assert arma.isinvertible()
+    y = arma.generate_sample()
+    dates = pd.date_range("1/1/1990", periods=len(y), freq='M')
+    ts = pd.Series(y, index=dates)
+
+    xpath = "/home/skipper/src/x12arima/x12a"
+
+    try:
+        results = x13_arima_analysis(xpath, ts)
+    except:
+        print("Caught exception")
+
+    results = x13_arima_analysis(xpath, ts, log=False)
+
+    # import pandas as pd
+    # seas_y = pd.read_csv("usmelec.csv")
+    # seas_y = pd.Series(seas_y["usmelec"].values,
+    #                        index=pd.DatetimeIndex(seas_y["date"], freq="MS"))
+    # results = x13_arima_analysis(xpath, seas_y)

@@ -8,23 +8,22 @@ Created on Wed Feb 19 12:39:49 2014
 Author: Josef Perktold
 """
 
-import pytest
 import numpy as np
 from scipy import stats
 
 from numpy.testing import assert_allclose, assert_array_less
 
-from statsmodels.sandbox.distributions.extras import NormExpan_gen
+from statsmodels.sandbox.distributions.extras import (SkewNorm_gen,
+                                       NormExpan_gen, pdf_moments)
+from statsmodels.stats.moment_helpers import mc2mvsk, mnc2mc
 
 
-class CheckDistribution:
+class CheckDistribution(object):
 
-    @pytest.mark.smoke
-    def test_dist1(self):
+    def test_smoke(self):
         self.dist1.rvs(size=10)
         self.dist1.pdf(np.linspace(-4, 4, 11))
 
-    def test_cdf_ppf_roundtrip(self):
         # round trip
         probs = np.linspace(0.001, 0.999, 6)
         ppf = self.dist2.ppf(probs)
@@ -60,29 +59,29 @@ class TestExpandNormMom(CheckExpandNorm):
     # compare with normal, skew=0, excess_kurtosis=0
 
     @classmethod
-    def setup_class(cls):
-        cls.scale = 2
-        cls.dist1 = stats.norm(1, 2)
-        cls.mvsk = [1., 2**2, 0, 0]
-        cls.dist2 = NormExpan_gen(cls.mvsk, mode='mvsk')
+    def setup_class(kls):
+        kls.scale = 2
+        kls.dist1 = stats.norm(1, 2)
+        kls.mvsk = [1., 2**2, 0, 0]
+        kls.dist2 = NormExpan_gen(kls.mvsk, mode='mvsk')
 
 
-class TestExpandNormSample:
-    # do not subclass CheckExpandNorm,
+class TestExpandNormSample(object):
+    # don't subclass CheckExpandNorm,
     # precision not high enough because of mvsk from data
 
     @classmethod
-    def setup_class(cls):
-        cls.dist1 = dist1 = stats.norm(1, 2)
+    def setup_class(kls):
+        kls.dist1 = dist1 = stats.norm(1, 2)
         np.random.seed(5999)
-        cls.rvs = dist1.rvs(size=200)
+        kls.rvs = dist1.rvs(size=200)
         #rvs = np.concatenate([rvs, -rvs])
         # fix mean and std of sample
         #rvs = (rvs - rvs.mean())/rvs.std(ddof=1) * np.sqrt(2) + 1
-        cls.dist2 = NormExpan_gen(cls.rvs, mode='sample')
+        kls.dist2 = NormExpan_gen(kls.rvs, mode='sample')
 
-        cls.scale = 2
-        cls.atol_pdf = 1e-3
+        kls.scale = 2
+        kls.atol_pdf = 1e-3
 
     def test_ks(self):
         # cdf is slow

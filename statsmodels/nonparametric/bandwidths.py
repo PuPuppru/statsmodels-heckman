@@ -1,11 +1,12 @@
-import numpy as np
-from scipy.stats import scoreatpercentile
+from __future__ import division
 
-from statsmodels.compat.pandas import Substitution
+import numpy as np
+from scipy.stats import scoreatpercentile as sap
 from statsmodels.sandbox.nonparametric import kernels
 
+#from scipy.stats import norm
 
-def _select_sigma(x, percentile=25):
+def _select_sigma(X):
     """
     Returns the smaller of std(X, ddof=1) or normalized IQR(X) over axis 0.
 
@@ -13,14 +14,12 @@ def _select_sigma(x, percentile=25):
     ----------
     Silverman (1986) p.47
     """
-    # normalize = norm.ppf(.75) - norm.ppf(.25)
+#    normalize = norm.ppf(.75) - norm.ppf(.25)
     normalize = 1.349
-    IQR = (scoreatpercentile(x, 75) - scoreatpercentile(x, 25)) / normalize
-    std_dev = np.std(x, axis=0, ddof=1)
-    if IQR > 0:
-        return np.minimum(std_dev, IQR)
-    else:
-        return std_dev
+#    IQR = np.subtract.reduce(percentile(X, [75,25],
+#                             axis=axis), axis=axis)/normalize
+    IQR = (sap(X, 75) - sap(X, 25))/normalize
+    return np.minimum(np.std(X, axis=0, ddof=1), IQR)
 
 
 ## Univariate Rule of Thumb Bandwidths ##
@@ -30,7 +29,7 @@ def bw_scott(x, kernel=None):
 
     Parameters
     ----------
-    x : array_like
+    x : array-like
         Array for which to get the bandwidth
     kernel : CustomKernel object
         Unused
@@ -63,7 +62,7 @@ def bw_silverman(x, kernel=None):
 
     Parameters
     ----------
-    x : array_like
+    x : array-like
         Array for which to get the bandwidth
     kernel : CustomKernel object
         Unused
@@ -90,7 +89,7 @@ def bw_silverman(x, kernel=None):
     return .9 * A * n ** (-0.2)
 
 
-def bw_normal_reference(x, kernel=None):
+def bw_normal_reference(x, kernel=kernels.Gaussian):
     """
     Plug-in bandwidth with kernel specific constant based on normal reference.
 
@@ -100,11 +99,10 @@ def bw_normal_reference(x, kernel=None):
 
     Parameters
     ----------
-    x : array_like
+    x : array-like
         Array for which to get the bandwidth
     kernel : CustomKernel object
         Used to calculate the constant for the plug-in bandwidth.
-        The default is a Gaussian kernel.
 
     Returns
     -------
@@ -129,8 +127,6 @@ def bw_normal_reference(x, kernel=None):
     Silverman, B.W. (1986) `Density Estimation.`
     Hansen, B.E. (2009) `Lecture Notes on Nonparametrics.`
     """
-    if kernel is None:
-        kernel = kernels.Gaussian()
     C = kernel.normal_reference_constant
     A = _select_sigma(x)
     n = len(x)
@@ -149,7 +145,6 @@ bandwidth_funcs = {
 }
 
 
-@Substitution(", ".join(sorted(bandwidth_funcs.keys())))
 def select_bandwidth(x, bw, kernel):
     """
     Selects bandwidth for a selection rule bw
@@ -158,9 +153,9 @@ def select_bandwidth(x, bw, kernel):
 
     Parameters
     ----------
-    x : array_like
+    x : array-like
         Array for which to get the bandwidth
-    bw : str
+    bw : string
         name of bandwidth selection rule, currently supported are:
         %s
     kernel : not used yet
@@ -169,16 +164,16 @@ def select_bandwidth(x, bw, kernel):
     -------
     bw : float
         The estimate of the bandwidth
+
     """
     bw = bw.lower()
     if bw not in bandwidth_funcs:
         raise ValueError("Bandwidth %s not understood" % bw)
-    bandwidth = bandwidth_funcs[bw](x, kernel)
-    if np.any(bandwidth == 0):
-        # eventually this can fall back on another selection criterion.
-        err = "Selected KDE bandwidth is 0. Cannot estimate density. " \
-              "Either provide the bandwidth during initialization or use " \
-              "an alternative method."
-        raise RuntimeError(err)
-    else:
-        return bandwidth
+#TODO: uncomment checks when we have non-rule of thumb bandwidths for diff. kernels
+#    if kernel == "gauss":
+    return bandwidth_funcs[bw](x, kernel)
+#    else:
+#        raise ValueError("Only Gaussian Kernels are currently supported")
+
+# Interpolate docstring to plugin supported bandwidths
+select_bandwidth.__doc__ %=  (", ".join(sorted(bandwidth_funcs.keys())),)

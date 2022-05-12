@@ -1,31 +1,29 @@
+from __future__ import division
+
 import numpy as np
 from numpy.testing import assert_almost_equal
-
 from statsmodels.datasets import star98
 from statsmodels.emplike.descriptive import DescStat
-
 from .results.el_results import DescStatRes
 
 
-class GenRes:
+class GenRes(object):
     """
     Reads in the data and creates class instance to be tested
+
     """
-    @classmethod
-    def setup_class(cls):
+    def __init__(self):
         data = star98.load()
-        data.exog = np.asarray(data.exog)
         desc_stat_data = data.exog[:50, 5]
         mv_desc_stat_data = data.exog[:50, 5:7]  # mv = multivariate
-        cls.res1 = DescStat(desc_stat_data)
-        cls.res2 = DescStatRes()
-        cls.mvres1 = DescStat(mv_desc_stat_data)
+        self.res1 = DescStat(desc_stat_data)
+        self.res2 = DescStatRes()
+        self.mvres1 = DescStat(mv_desc_stat_data)
 
 
 class TestDescriptiveStatistics(GenRes):
-    @classmethod
-    def setup_class(cls):
-        super(TestDescriptiveStatistics, cls).setup_class()
+    def __init__(self):
+        super(TestDescriptiveStatistics, self).__init__()
 
     def test_test_mean(self):
         assert_almost_equal(self.res1.test_mean(14),
@@ -55,20 +53,23 @@ class TestDescriptiveStatistics(GenRes):
 
     def test_mv_test_mean_weights(self):
         assert_almost_equal(self.mvres1.mv_test_mean(np.array([14, 56]),
-                                                     return_weights=1)[2],
-                            self.res2.mv_test_mean_wts, 4)
+                                        return_weights=1)[2],
+                                        self.res2.mv_test_mean_wts, 4)
 
     def test_test_skew(self):
         assert_almost_equal(self.res1.test_skew(0),
                             self.res2.test_skew, 4)
 
     def test_ci_skew(self):
-        # This will be tested in a round about way since MATLAB fails when
-        # computing CI with multiple nuisance parameters.  The process is:
-        #
-        # (1) Get CI for skewness from ci.skew()
-        # (2) In MATLAB test the hypotheis that skew=results of test_skew.
-        # (3) If p-value approx .05, test confirmed
+        """
+        This will be tested in a round about way since MATLAB fails when
+        computing CI with multiple nuisance parameters.  The process is:
+
+        (1) Get CI for skewness from ci.skew()
+        (2) In MATLAB test the hypotheis that skew=results of test_skew.
+        (3) If p-value approx .05, test confirmed
+
+        """
         skew_ci = self.res1.ci_skew()
         lower_lim = skew_ci[0]
         upper_lim = skew_ci[1]
@@ -86,7 +87,11 @@ class TestDescriptiveStatistics(GenRes):
                             self.res2.test_kurt_0, 4)
 
     def test_ci_kurt(self):
-        # Same strategy for skewness CI
+        """
+
+        Same strategy for skewness CI
+
+        """
         kurt_ci = self.res1.ci_kurt(upper_bound=.5, lower_bound=-1.5)
         lower_lim = kurt_ci[0]
         upper_lim = kurt_ci[1]

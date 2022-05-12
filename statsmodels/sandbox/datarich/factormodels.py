@@ -6,7 +6,9 @@ Author: josef-pktd
 License: BSD (3-clause)
 """
 
+from __future__ import print_function
 import numpy as np
+from numpy.testing import assert_array_almost_equal
 import statsmodels.api as sm
 from statsmodels.sandbox.tools import pca
 from statsmodels.sandbox.tools.cross_val import LeaveOneOut
@@ -15,7 +17,7 @@ from statsmodels.sandbox.tools.cross_val import LeaveOneOut
 #from sandbox/example_pca_regression.py
 
 
-class FactorModelUnivariate:
+class FactorModelUnivariate(object):
     '''
 
     Todo:
@@ -129,7 +131,7 @@ class FactorModelUnivariate:
 
         Returns
         -------
-        sumstr : str
+        sumstr : string
             summary of the results for selecting the number of factors
 
         '''
@@ -145,7 +147,8 @@ class FactorModelUnivariate:
 
         sumstr += '\n' + ' '*19 + '%5d %4d %6d %5d' % tuple(self.best_nfact)
 
-        from statsmodels.iolib.table import SimpleTable
+        from statsmodels.iolib.table import (SimpleTable, default_txt_fmt,
+                                default_latex_fmt, default_html_fmt)
 
         headers = 'k, AIC, BIC, R2_adj, L1O'.split(', ')
         numformat = ['%6d'] + ['%10.3f']*4 #'%10.4f'
@@ -185,3 +188,6 @@ if __name__ == '__main__':
         print("with cross validation - slower")
         mod.fit_find_nfact(maxfact=None, skip_crossval=False, cv_iter=None)
         print(mod.summary_find_nfact())
+
+
+

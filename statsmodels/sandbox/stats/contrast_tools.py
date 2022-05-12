@@ -22,8 +22,8 @@ Idea for second part
 
 
 
-from numpy.testing import assert_equal
-
+from __future__ import print_function
+from statsmodels.compat.python import zip
 import numpy as np
 
 #next 3 functions copied from multicomp.py
@@ -153,7 +153,7 @@ def contrast_product(names1, names2, intgroup1=None, intgroup2=None, pairs=False
                               for c,v in zip(row, names_prod)[::-1] if c != 0])
                                  for row in contrast_prod2]
 
-    if (intgroup1 is not None) and (intgroup1 is not None):
+    if (not intgroup1 is None) and (not intgroup1 is None):
         d1, _ = dummy_1d(intgroup1)
         d2, _ = dummy_1d(intgroup2)
         dummy = dummy_product(d1, d2)
@@ -170,11 +170,11 @@ def contrast_product(names1, names2, intgroup1=None, intgroup2=None, pairs=False
 def dummy_1d(x, varname=None):
     '''dummy variable for id integer groups
 
-    Parameters
-    ----------
+    Paramters
+    ---------
     x : ndarray, 1d
         categorical variable, requires integers if varname is None
-    varname : str
+    varname : string
         name of the variable used in labels for category levels
 
     Returns
@@ -182,7 +182,7 @@ def dummy_1d(x, varname=None):
     dummy : ndarray, 2d
         array of dummy variables, one column for each level of the
         category (full set)
-    labels : list[str]
+    labels : list of strings
         labels for the columns, i.e. levels of each category
 
 
@@ -350,7 +350,7 @@ def dummy_nested(d1, d2, method='full'):
     return dd, col_dropf, col_dropl
 
 
-class DummyTransform:
+class DummyTransform(object):
     '''Conversion between full rank dummy encodings
 
 
@@ -388,8 +388,8 @@ class DummyTransform:
 
         should be (x, z) in arguments ?
         '''
-        self.transf_matrix = np.linalg.lstsq(d1, d2, rcond=-1)[0]
-        self.invtransf_matrix = np.linalg.lstsq(d2, d1, rcond=-1)[0]
+        self.transf_matrix = np.linalg.lstsq(d1, d2)[0]
+        self.invtransf_matrix = np.linalg.lstsq(d2, d1)[0]
 
     def dot_left(self, a):
         ''' b = C a
@@ -450,7 +450,7 @@ def groupmean_d(x, d):
 
 
 
-class TwoWay:
+class TwoWay(object):
     '''a wrapper class for two way anova type of analysis with OLS
 
 
@@ -550,10 +550,18 @@ class TwoWay:
                            txt_fmt=table_fmt)
 
 
-# --------------- tests
-# TODO: several tests still missing, several are in the example with print
 
-class TestContrastTools:
+
+
+
+
+#--------------- tests
+
+from numpy.testing import assert_equal
+
+#TODO: several tests still missing, several are in the example with print
+
+class TestContrastTools(object):
 
     def __init__(self):
         self.v1name = ['a0', 'a1', 'a2']
@@ -631,7 +639,7 @@ if __name__ == '__main__':
 
     y = np.arange(12)
     x1 = np.arange(12)//4
-    x2 = np.arange(12)//2 % 2
+    x2 = np.arange(12)//2%2
 
     if 'small' in examples:
         d1, d1_labels = dummy_1d(x1)
@@ -676,8 +684,8 @@ if __name__ == '__main__':
     params_df_df = resols_dropf_dropf.params
 
 
-    tr_of = np.linalg.lstsq(dd_dropf, dd_full, rcond=-1)[0]
-    tr_fo = np.linalg.lstsq(dd_full, dd_dropf, rcond=-1)[0]
+    tr_of = np.linalg.lstsq(dd_dropf, dd_full)[0]
+    tr_fo = np.linalg.lstsq(dd_full, dd_dropf)[0]
     print(np.dot(tr_fo, params_df_df) - params_df_f)
     print(np.dot(tr_of, params_f_f) - params_f_df)
 

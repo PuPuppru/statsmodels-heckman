@@ -7,7 +7,7 @@ import scipy.stats
 FLOAT_EPS = np.finfo(float).eps
 
 
-class Link:
+class Link(object):
     """
     A generic link function for one-parameter exponential family.
 
@@ -20,12 +20,12 @@ class Link:
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Probabilities
 
         Returns
         -------
-        g(p) : array_like
+        g(p) : array-like
             The value of the link function g(p) = z
         """
         return NotImplementedError
@@ -36,14 +36,16 @@ class Link:
 
         Parameters
         ----------
-        z : array_like
+        z : array-like
             `z` is usually the linear predictor of the transformed variable
             in the IRLS algorithm for GLM.
 
         Returns
         -------
-        g^(-1)(z) : ndarray
+        g^(-1)(z) : array
             The value of the inverse of the link function g^(-1)(z) = p
+
+
         """
         return NotImplementedError
 
@@ -53,11 +55,11 @@ class Link:
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
 
         Returns
         -------
-        g'(p) : ndarray
+        g'(p) : array
             The value of the derivative of the link function g'(p)
         """
         return NotImplementedError
@@ -67,52 +69,31 @@ class Link:
 
         implemented through numerical differentiation
         """
-        from statsmodels.tools.numdiff import _approx_fprime_cs_scalar
-        return _approx_fprime_cs_scalar(p, self.deriv)
+        from statsmodels.tools.numdiff import approx_fprime_cs
+        # TODO: workaround proplem with numdiff for 1d
+        return np.diag(approx_fprime_cs(p, self.deriv))
 
     def inverse_deriv(self, z):
         """
         Derivative of the inverse link function g^(-1)(z).
 
+        Notes
+        -----
+        This reference implementation gives the correct result but is
+        inefficient, so it can be overriden in subclasses.
+
         Parameters
         ----------
-        z : array_like
+        z : array-like
             `z` is usually the linear predictor for a GLM or GEE model.
 
         Returns
         -------
-        g'^(-1)(z) : ndarray
+        g'^(-1)(z) : array
             The value of the derivative of the inverse of the link function
 
-        Notes
-        -----
-        This reference implementation gives the correct result but is
-        inefficient, so it can be overridden in subclasses.
         """
         return 1 / self.deriv(self.inverse(z))
-
-    def inverse_deriv2(self, z):
-        """
-        Second derivative of the inverse link function g^(-1)(z).
-
-        Parameters
-        ----------
-        z : array_like
-            `z` is usually the linear predictor for a GLM or GEE model.
-
-        Returns
-        -------
-        g'^(-1)(z) : ndarray
-            The value of the second derivative of the inverse of the link
-            function
-
-        Notes
-        -----
-        This reference implementation gives the correct result but is
-        inefficient, so it can be overridden in subclasses.
-        """
-        iz = self.inverse(z)
-        return -self.deriv2(iz) / self.deriv(iz)**3
 
 
 class Logit(Link):
@@ -133,13 +114,13 @@ class Logit(Link):
         Clip logistic values to range (eps, 1-eps)
 
         Parameters
-        ----------
-        p : array_like
+        -----------
+        p : array-like
             Probabilities
 
         Returns
-        -------
-        pclip : ndarray
+        --------
+        pclip : array
             Clipped probabilities
         """
         return np.clip(p, FLOAT_EPS, 1. - FLOAT_EPS)
@@ -150,12 +131,12 @@ class Logit(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Probabilities
 
         Returns
         -------
-        z : ndarray
+        z : array
             Logit transform of `p`
 
         Notes
@@ -171,12 +152,12 @@ class Logit(Link):
 
         Parameters
         ----------
-        z : array_like
+        z : array-like
             The value of the logit transform at `p`
 
         Returns
         -------
-        p : ndarray
+        p : array
             Probabilities
 
         Notes
@@ -188,17 +169,18 @@ class Logit(Link):
         return 1. / (1. + t)
 
     def deriv(self, p):
+
         """
         Derivative of the logit transform
 
         Parameters
         ----------
-        p : array_like
+        p: array-like
             Probabilities
 
         Returns
         -------
-        g'(p) : ndarray
+        g'(p) : array
             Value of the derivative of logit transform at `p`
 
         Notes
@@ -217,13 +199,14 @@ class Logit(Link):
 
         Parameters
         ----------
-        z : array_like
+        z : array-like
             `z` is usually the linear predictor for a GLM or GEE model.
 
         Returns
         -------
-        g'^(-1)(z) : ndarray
+        g'^(-1)(z) : array
             The value of the derivative of the inverse of the logit function
+
         """
         t = np.exp(z)
         return t/(1 + t)**2
@@ -234,12 +217,12 @@ class Logit(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             probabilities
 
         Returns
         -------
-        g''(z) : ndarray
+        g''(z) : array
             The value of the second derivative of the logit function
         """
         v = p * (1 - p)
@@ -277,12 +260,12 @@ class Power(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        z : array_like
+        z : array-like
             Power transform of x
 
         Notes
@@ -300,12 +283,12 @@ class Power(Link):
 
         Parameters
         ----------
-        `z` : array_like
+        `z` : array-like
             Value of the transformed mean parameters at `p`
 
         Returns
         -------
-        `p` : ndarray
+        `p` : array
             Mean parameters
 
         Notes
@@ -323,12 +306,12 @@ class Power(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
-        -------
-        g'(p) : ndarray
+        --------
+        g'(p) : array
             Derivative of power transform of `p`
 
         Notes
@@ -346,12 +329,12 @@ class Power(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
-        -------
-        g''(p) : ndarray
+        --------
+        g''(p) : array
             Second derivative of the power transform of `p`
 
         Notes
@@ -369,12 +352,12 @@ class Power(Link):
 
         Parameters
         ----------
-        z : array_like
+        z : array-like
             `z` is usually the linear predictor for a GLM or GEE model.
 
         Returns
         -------
-        g^(-1)'(z) : ndarray
+        g^(-1)'(z) : array
             The value of the derivative of the inverse of the power transform
         function
         """
@@ -382,27 +365,6 @@ class Power(Link):
             return np.ones_like(z)
         else:
             return np.power(z, (1 - self.power)/self.power) / self.power
-
-    def inverse_deriv2(self, z):
-        """
-        Second derivative of the inverse of the power transform
-
-        Parameters
-        ----------
-        z : array_like
-            `z` is usually the linear predictor for a GLM or GEE model.
-
-        Returns
-        -------
-        g^(-1)'(z) : ndarray
-            The value of the derivative of the inverse of the power transform
-        function
-        """
-        if self.power == 1:
-            return np.zeros_like(z)
-        else:
-            return ((1 - self.power) *
-                    np.power(z, (1 - 2*self.power)/self.power) / self.power**2)
 
 
 class inverse_power(Power):
@@ -434,7 +396,7 @@ class sqrt(Power):
 
 
 class inverse_squared(Power):
-    r"""
+    """
     The inverse squared transform
 
     Notes
@@ -480,12 +442,12 @@ class Log(Link):
 
         Parameters
         ----------
-        x : array_like
+        x : array-like
             Mean parameters
 
         Returns
         -------
-        z : ndarray
+        z : array
             log(x)
 
         Notes
@@ -501,12 +463,12 @@ class Log(Link):
 
         Parameters
         ----------
-        z : ndarray
+        z : array
             The inverse of the link function at `p`
 
         Returns
         -------
-        p : ndarray
+        p : array
             The mean probabilities given the value of the inverse `z`
 
         Notes
@@ -521,12 +483,12 @@ class Log(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        g'(p) : ndarray
+        g'(p) : array
             derivative of log transform of x
 
         Notes
@@ -542,12 +504,12 @@ class Log(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        g''(p) : ndarray
+        g''(p) : array
             Second derivative of log transform of x
 
         Notes
@@ -563,12 +525,12 @@ class Log(Link):
 
         Parameters
         ----------
-        z : ndarray
+        z : array
             The inverse of the link function at `p`
 
         Returns
         -------
-        g^(-1)'(z) : ndarray
+        g^(-1)'(z) : array
             The value of the derivative of the inverse of the log function,
             the exponential function
         """
@@ -613,12 +575,12 @@ class CDFLink(Logit):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        z : ndarray
+        z : array
             (ppf) inverse of CDF transform of p
 
         Notes
@@ -634,12 +596,12 @@ class CDFLink(Logit):
 
         Parameters
         ----------
-        z : array_like
+        z : array-like
             The value of the inverse of the link function at `p`
 
         Returns
         -------
-        p : ndarray
+        p : array
             Mean probabilities.  The value of the inverse of CDF link of `z`
 
         Notes
@@ -654,12 +616,12 @@ class CDFLink(Logit):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             mean parameters
 
         Returns
         -------
-        g'(p) : ndarray
+        g'(p) : array
             The derivative of CDF transform at `p`
 
         Notes
@@ -675,64 +637,26 @@ class CDFLink(Logit):
 
         implemented through numerical differentiation
         """
-        p = self._clean(p)
-        linpred = self.dbn.ppf(p)
-        return - self.inverse_deriv2(linpred) / self.dbn.pdf(linpred)**3
-
-    def deriv2_numdiff(self, p):
-        """
-        Second derivative of the link function g''(p)
-
-        implemented through numerical differentiation
-        """
-        from statsmodels.tools.numdiff import _approx_fprime_scalar
+        from statsmodels.tools.numdiff import approx_fprime
         p = np.atleast_1d(p)
         # Note: special function for norm.ppf does not support complex
-        return _approx_fprime_scalar(p, self.deriv, centered=True)
+        return np.diag(approx_fprime(p, self.deriv, centered=True))
 
     def inverse_deriv(self, z):
         """
-        Derivative of the inverse link function
+        Derivative of the inverse of the CDF transformation link function
 
         Parameters
         ----------
-        z : ndarray
+        z : array
             The inverse of the link function at `p`
 
         Returns
         -------
-        g^(-1)'(z) : ndarray
-            The value of the derivative of the inverse of the logit function.
-            This is just the pdf in a CDFLink,
+        g^(-1)'(z) : array
+            The value of the derivative of the inverse of the logit function
         """
-        return self.dbn.pdf(z)
-
-    def inverse_deriv2(self, z):
-        """
-        Second derivative of the inverse link function g^(-1)(z).
-
-        Parameters
-        ----------
-        z : array_like
-            `z` is usually the linear predictor for a GLM or GEE model.
-
-        Returns
-        -------
-        g^(-1)''(z) : ndarray
-            The value of the second derivative of the inverse of the link
-            function
-
-        Notes
-        -----
-        This method should be overwritten by subclasses.
-
-        The inherited method is implemented through numerical differentiation.
-        """
-        from statsmodels.tools.numdiff import _approx_fprime_scalar
-        z = np.atleast_1d(z)
-
-        # Note: special function for norm.ppf does not support complex
-        return _approx_fprime_scalar(z, self.inverse_deriv, centered=True)
+        return 1/self.deriv(self.inverse(z))
 
 
 class probit(CDFLink):
@@ -740,29 +664,12 @@ class probit(CDFLink):
     The probit (standard normal CDF) transform
 
     Notes
-    -----
+    --------
     g(p) = scipy.stats.norm.ppf(p)
 
     probit is an alias of CDFLink.
     """
-
-    def inverse_deriv2(self, z):
-        """
-        Second derivative of the inverse link function
-
-        This is the derivative of the pdf in a CDFLink
-
-        """
-        return - z * self.dbn.pdf(z)
-
-    def deriv2(self, p):
-        """
-        Second derivative of the link function g''(p)
-
-        """
-        p = self._clean(p)
-        linpred = self.dbn.ppf(p)
-        return linpred / self.dbn.pdf(linpred)**2
+    pass
 
 
 class cauchy(CDFLink):
@@ -785,22 +692,17 @@ class cauchy(CDFLink):
 
         Parameters
         ----------
-        p : array_like
+        p: array-like
             Probabilities
 
         Returns
         -------
-        g''(p) : ndarray
+        g''(p) : array
             Value of the second derivative of Cauchy link function at `p`
         """
-        p = self._clean(p)
         a = np.pi * (p - 0.5)
         d2 = 2 * np.pi**2 * np.sin(a) / np.cos(a)**3
         return d2
-
-    def inverse_deriv2(self, z):
-
-        return - 2 * z / (np.pi * (z**2 + 1)**2)
 
 
 class CLogLog(Logit):
@@ -820,12 +722,12 @@ class CLogLog(Logit):
 
         Parameters
         ----------
-        p : ndarray
+        p : array
             Mean parameters
 
         Returns
         -------
-        z : ndarray
+        z : array
             The CLogLog transform of `p`
 
         Notes
@@ -842,12 +744,12 @@ class CLogLog(Logit):
 
         Parameters
         ----------
-        z : array_like
+        z : array-like
             The value of the inverse of the CLogLog link function at `p`
 
         Returns
         -------
-        p : ndarray
+        p : array
             Mean parameters
 
         Notes
@@ -862,12 +764,12 @@ class CLogLog(Logit):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        g'(p) : ndarray
+        g'(p) : array
             The derivative of the CLogLog transform link function
 
         Notes
@@ -883,12 +785,12 @@ class CLogLog(Logit):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        g''(p) : ndarray
+        g''(p) : array
             The second derivative of the CLogLog link function
         """
         p = self._clean(p)
@@ -903,12 +805,12 @@ class CLogLog(Logit):
 
         Parameters
         ----------
-        z : array_like
+        z : array-like
             The value of the inverse of the CLogLog link function at `p`
 
         Returns
         -------
-        g^(-1)'(z) : ndarray
+        g^(-1)'(z) : array
             The derivative of the inverse of the CLogLog link function
         """
         return np.exp(z - np.exp(z))
@@ -924,141 +826,6 @@ class cloglog(CLogLog):
 
     cloglog is an alias for CLogLog
     cloglog = CLogLog()
-    """
-    pass
-
-
-class LogLog(Logit):
-    """
-    The log-log transform
-
-    LogLog inherits from Logit in order to have access to its _clean method
-    for the link and its derivative.
-    """
-    def __call__(self, p):
-        """
-        Log-Log transform link function
-
-        Parameters
-        ----------
-        p : ndarray
-            Mean parameters
-
-        Returns
-        -------
-        z : ndarray
-            The LogLog transform of `p`
-
-        Notes
-        -----
-        g(p) = -log(-log(p))
-        """
-        p = self._clean(p)
-        return -np.log(-np.log(p))
-
-    def inverse(self, z):
-        """
-        Inverse of Log-Log transform link function
-
-
-        Parameters
-        ----------
-        z : array_like
-            The value of the inverse of the LogLog link function at `p`
-
-        Returns
-        -------
-        p : ndarray
-            Mean parameters
-
-        Notes
-        -----
-        g^(-1)(`z`) = exp(-exp(-`z`))
-        """
-        return np.exp(-np.exp(-z))
-
-    def deriv(self, p):
-        """
-        Derivative of Log-Log transform link function
-
-        Parameters
-        ----------
-        p : array_like
-            Mean parameters
-
-        Returns
-        -------
-        g'(p) : ndarray
-            The derivative of the LogLog transform link function
-
-        Notes
-        -----
-        g'(p) = - 1 /(p * log(p))
-        """
-        p = self._clean(p)
-        return -1. / (p * (np.log(p)))
-
-    def deriv2(self, p):
-        """
-        Second derivative of the Log-Log link function
-
-        Parameters
-        ----------
-        p : array_like
-            Mean parameters
-
-        Returns
-        -------
-        g''(p) : ndarray
-            The second derivative of the LogLog link function
-        """
-        p = self._clean(p)
-        d2 = (1 + np.log(p)) / (p * (np.log(p)))**2
-        return d2
-
-    def inverse_deriv(self, z):
-        """
-        Derivative of the inverse of the Log-Log transform link function
-
-        Parameters
-        ----------
-        z : array_like
-            The value of the inverse of the LogLog link function at `p`
-
-        Returns
-        -------
-        g^(-1)'(z) : ndarray
-            The derivative of the inverse of the LogLog link function
-        """
-        return np.exp(-np.exp(-z) - z)
-
-    def inverse_deriv2(self, z):
-        """
-        Second derivative of the inverse of the Log-Log transform link function
-
-        Parameters
-        ----------
-        z : array_like
-            The value of the inverse of the LogLog link function at `p`
-
-        Returns
-        -------
-        g^(-1)''(z) : ndarray
-            The second derivative of the inverse of the LogLog link function
-        """
-        return self.inverse_deriv(z) * (np.exp(-z) - 1)
-
-
-class loglog(LogLog):
-    """
-    The LogLog transform link function.
-
-    Notes
-    -----
-    g(`p`) = -log(-log(`p`))
-
-    loglog is an alias for LogLog
-    loglog = LogLog()
     """
     pass
 
@@ -1087,12 +854,12 @@ class NegativeBinomial(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        z : ndarray
+        z : array
             The negative binomial transform of `p`
 
         Notes
@@ -1107,13 +874,13 @@ class NegativeBinomial(Link):
         Inverse of the negative binomial transform
 
         Parameters
-        ----------
-        z : array_like
+        -----------
+        z : array-like
             The value of the inverse of the negative binomial link at `p`.
 
         Returns
         -------
-        p : ndarray
+        p : array
             Mean parameters
 
         Notes
@@ -1128,12 +895,12 @@ class NegativeBinomial(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        g'(p) : ndarray
+        g'(p) : array
             The derivative of the negative binomial transform link function
 
         Notes
@@ -1148,12 +915,12 @@ class NegativeBinomial(Link):
 
         Parameters
         ----------
-        p : array_like
+        p : array-like
             Mean parameters
 
         Returns
         -------
-        g''(p) : ndarray
+        g''(p) : array
             The second derivative of the negative binomial transform link
             function
 
@@ -1170,13 +937,13 @@ class NegativeBinomial(Link):
         Derivative of the inverse of the negative binomial transform
 
         Parameters
-        ----------
-        z : array_like
+        -----------
+        z : array-like
             Usually the linear predictor for a GLM or GEE model
 
         Returns
         -------
-        g^(-1)'(z) : ndarray
+        g^(-1)'(z) : array
             The value of the derivative of the inverse of the negative
             binomial link
         '''

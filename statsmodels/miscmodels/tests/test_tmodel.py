@@ -6,13 +6,16 @@ Created on Sun Jun 30 20:25:22 2013
 Author: Josef Perktold
 """
 
-import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
 from statsmodels.tools.tools import add_constant
-from statsmodels.tools.testing import Holder
 from statsmodels.miscmodels.tmodel import TLinearModel
+
+
+class Holder(object):
+    def __init__(self, **kwds):
+        self.__dict__.update(kwds)
 
 
 mm = Holder()
@@ -68,7 +71,7 @@ mm.date = np.array([
     ])
 
 
-class CheckTLinearModelMixin:
+class CheckTLinearModelMixin(object):
 
     def test_basic(self):
         res1 = self.res1
@@ -116,8 +119,7 @@ class CheckTLinearModelMixin:
         assert_allclose(res1.model.endog, resf.model.endog, rtol=1e-10)
         assert_allclose(res1.model.exog, resf.model.exog, rtol=1e-10)
 
-    @pytest.mark.smoke
-    def test_smoke(self):  # TODO: break into well-scoped tests
+    def test_smoke(self):
         res1 = self.res1
         resf = self.resf
         contr = np.eye(len(res1.params))
@@ -149,7 +151,7 @@ class TestTModel(CheckTLinearModelMixin):
         cls.resf = resf
 
 
-class TestTModelFixed:
+class TestTModelFixed(object):
 
     @classmethod
     def setup_class(cls):
@@ -167,8 +169,7 @@ class TestTModelFixed:
         cls.res1 = res  # take from module scope temporarily
         cls.resf = resf
 
-    @pytest.mark.smoke
-    def test_smoke(self):  # TODO: break into well-scoped tests
+    def test_smoke(self):
         res1 = self.res1
         resf = self.resf
         contr = np.eye(len(res1.params))

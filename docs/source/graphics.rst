@@ -1,4 +1,4 @@
-.. currentmodule:: statsmodels.graphics.gofplots
+.. currentmodule:: statsmodels.graphics
 
 .. _graphics:
 
@@ -10,119 +10,73 @@ Graphics
 Goodness of Fit Plots
 ---------------------
 
-.. currentmodule:: statsmodels.graphics.gofplots
 .. autosummary::
    :toctree: generated/
 
-   qqplot
-   qqline
-   qqplot_2samples
-   ProbPlot
+   gofplots.qqplot
+   gofplots.qqline
+   gofplots.qqplot_2samples
+   gofplots.ProbPlot
 
 Boxplots
 --------
 
-.. currentmodule:: statsmodels.graphics.boxplots
-
 .. autosummary::
    :toctree: generated/
 
-   violinplot
-   beanplot
+   boxplots.violinplot
+   boxplots.beanplot
 
 Correlation Plots
 ------------------
 
-.. currentmodule:: statsmodels.graphics.correlation
-
 .. autosummary::
    :toctree: generated/
 
-   plot_corr
-   plot_corr_grid
-
-.. currentmodule:: statsmodels.graphics.plot_grids
-
-.. autosummary::
-   :toctree: generated/
-
-   scatter_ellipse
-
-Dot Plots
----------
-
-.. currentmodule:: statsmodels.graphics.dotplots
-
-.. autosummary::
-   :toctree: generated/
-
-   dot_plot
+   correlation.plot_corr
+   correlation.plot_corr_grid
+   plot_grids.scatter_ellipse
 
 Functional Plots
 ----------------
 
-.. currentmodule:: statsmodels.graphics.functional
-
 .. autosummary::
    :toctree: generated/
 
-   hdrboxplot
-   fboxplot
-   rainbowplot
-   banddepth
+   functional.fboxplot
+   functional.rainbowplot
+   functional.banddepth
 
 Regression Plots
 ----------------
 
-.. currentmodule:: statsmodels.graphics.regressionplots
-
 .. autosummary::
    :toctree: generated/
 
-   plot_fit
-   plot_regress_exog
-   plot_partregress
-   plot_partregress_grid
-   plot_ccpr
-   plot_ccpr_grid
-   plot_ceres_residuals
-   abline_plot
-   influence_plot
-   plot_leverage_resid2
+   regressionplots.plot_fit
+   regressionplots.plot_regress_exog
+   regressionplots.plot_partregress
+   regressionplots.plot_ccpr
+   regressionplots.abline_plot
+   regressionplots.influence_plot
+   regressionplots.plot_leverage_resid2
 
 Time Series Plots
 -----------------
 
-.. currentmodule:: statsmodels.graphics.tsaplots
-
 .. autosummary::
    :toctree: generated/
 
-   plot_acf
-   plot_pacf
-   month_plot
-   quarter_plot
+   tsaplots.plot_acf
+   tsaplots.plot_pacf
+   tsaplots.month_plot
+   tsaplots.quarter_plot
 
 Other Plots
 -----------
 
-.. currentmodule:: statsmodels.graphics.factorplots
-
 .. autosummary::
    :toctree: generated/
 
-   interaction_plot
-
-.. currentmodule:: statsmodels.graphics.mosaicplot
-
-.. autosummary::
-   :toctree: generated/
-
-   mosaic
-
-.. currentmodule:: statsmodels.graphics.agreement
-
-.. autosummary::
-   :toctree: generated/
-
-   mean_diff_plot
+   factorplots.interaction_plot
+   mosaicplot.mosaic

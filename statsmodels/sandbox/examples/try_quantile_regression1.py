@@ -7,8 +7,7 @@ polynomial regression with systematic deviations above
 '''
 
 import numpy as np
-import matplotlib.pyplot as plt
-
+from statsmodels.compat.python import zip
 from scipy import stats
 import statsmodels.api as sm
 
@@ -31,11 +30,12 @@ res_ols = sm.OLS(y, exog).fit()
 params = [res_ols.params, res_qr2.params, res_qr.params, res_qr3.params]
 labels = ['ols', 'qr 0.1', 'qr 0.5', 'qr 0.75']
 
+import matplotlib.pyplot as plt
 
 plt.figure()
 plt.plot(x, y, '.', alpha=0.5)
 for lab, beta in zip(['ols', 'qr 0.1', 'qr 0.5', 'qr 0.75'], params):
-    print('%-8s' % lab, np.round(beta, 4))
+    print('%-8s'%lab, np.round(beta, 4))
     fitted = np.dot(exog, beta)
     lw = 2
     plt.plot(x, fitted, lw=lw, label=lab)

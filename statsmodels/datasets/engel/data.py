@@ -1,5 +1,6 @@
+#! /usr/bin/env python
+
 """Name of dataset."""
-from statsmodels.datasets import utils as du
 
 __docformat__ = 'restructuredtext'
 
@@ -30,22 +31,35 @@ NOTE        = """::
         foodexp - annual household food expenditure (Belgian francs)
 """
 
+import numpy as np
+from statsmodels.datasets import utils as du
+from os.path import dirname, abspath
+
 def load():
     """
     Load the data and return a Dataset class instance.
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
-    return load_pandas()
-
+    data = _get_data()
+    ##### SET THE INDICES #####
+    #NOTE: None for exog_idx is the complement of endog_idx
+    return du.process_recarray(data, endog_idx=0, exog_idx=None, dtype=float)
 
 def load_pandas():
     data = _get_data()
-    return du.process_pandas(data, endog_idx=0, exog_idx=None)
-
+    ##### SET THE INDICES #####
+    #NOTE: None for exog_idx is the complement of endog_idx
+    return du.process_recarray_pandas(data, endog_idx=0, exog_idx=None,
+                                      dtype=float)
 
 def _get_data():
-    return du.load_csv(__file__, 'engel.csv')
+    filepath = dirname(abspath(__file__))
+    ##### EDIT THE FOLLOWING TO POINT TO DatasetName.csv #####
+    with open(filepath + '/engel.csv', 'rb') as f:
+        data = np.recfromtxt(f,
+                             delimiter=",", names = True, dtype=float)
+    return data

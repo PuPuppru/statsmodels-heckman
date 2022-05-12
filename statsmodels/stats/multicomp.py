@@ -5,15 +5,12 @@ Created on Fri Mar 30 18:27:25 2012
 Author: Josef Perktold
 """
 
-from statsmodels.sandbox.stats.multicomp import (  # noqa:F401
-    tukeyhsd, MultiComparison)
-
-__all__ = ['tukeyhsd', 'MultiComparison']
-
+from statsmodels.sandbox.stats.multicomp import tukeyhsd, MultiComparison
 
 def pairwise_tukeyhsd(endog, groups, alpha=0.05):
-    """
-    Calculate all pairwise comparisons with TukeyHSD confidence intervals
+    '''calculate all pairwise comparisons with TukeyHSD confidence intervals
+
+    this is just a wrapper around tukeyhsd method of MultiComparison
 
     Parameters
     ----------
@@ -28,17 +25,14 @@ def pairwise_tukeyhsd(endog, groups, alpha=0.05):
     -------
     results : TukeyHSDResults instance
         A results class containing relevant data and some post-hoc
-        calculations, including adjusted p-value
-
-    Notes
-    -----
-    This is just a wrapper around tukeyhsd method of MultiComparison
+        calculations
 
     See Also
     --------
     MultiComparison
     tukeyhsd
     statsmodels.sandbox.stats.multicomp.TukeyHSDResults
-    """
+
+    '''
 
     return MultiComparison(endog, groups).tukeyhsd(alpha=alpha)

@@ -1,28 +1,26 @@
+from __future__ import division
+
 import numpy as np
 from numpy.testing import assert_almost_equal
-import pytest
-
 from statsmodels.datasets import heart
-from statsmodels.emplike.aft_el import emplikeAFT
 from statsmodels.tools import add_constant
-
+from statsmodels.emplike.aft_el import emplikeAFT
 from .results.el_results import AFTRes
 
 
-class GenRes:
-    @classmethod
-    def setup_class(cls):
+class GenRes(object):
+    def __init__(self):
         data = heart.load()
-        data.endog = np.asarray(data.endog)
-        data.exog = np.asarray(data.exog)
         endog = np.log10(data.endog)
         exog = add_constant(data.exog)
-        cls.mod1 = emplikeAFT(endog, exog, data.censors)
-        cls.res1 = cls.mod1.fit()
-        cls.res2 = AFTRes()
+        self.mod1 = emplikeAFT(endog, exog, data.censors)
+        self.res1 = self.mod1.fit()
+        self.res2 = AFTRes()
 
 
 class Test_AFTModel(GenRes):
+    def __init__(self):
+        super(Test_AFTModel, self).__init__()
 
     def test_params(self):
         assert_almost_equal(self.res1.params(), self.res2.test_params,
@@ -40,7 +38,6 @@ class Test_AFTModel(GenRes):
         assert_almost_equal(self.res1.test_beta([3.5, -.035], [0, 1]),
                             self.res2.test_joint, decimal=4)
 
-    @pytest.mark.slow
     def test_betaci(self):
         ci = self.res1.ci_beta(1, -.06, 0)
         ll = ci[0]

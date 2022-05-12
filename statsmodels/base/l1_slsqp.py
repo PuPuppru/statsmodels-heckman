@@ -41,9 +41,9 @@ def fit_l1_slsqp(
     auto_trim_tol : float
         For sue when trim_mode == 'auto'.  Use
     qc_tol : float
-        Print warning and do not allow auto trim when (ii) in "Theory" (above)
+        Print warning and don't allow auto trim when (ii) in "Theory" (above)
         is violated by this much.
-    qc_verbose : bool
+    qc_verbose : Boolean
         If true, print out a full QC report upon failure
     acc : float (default 1e-6)
         Requested accuracy as used by slsqp
@@ -94,20 +94,18 @@ def fit_l1_slsqp(
         auto_trim_tol)
 
     ### Pack up return values for statsmodels optimizers
-    # TODO These retvals are returned as mle_retvals...but the fit was not ML.
+    # TODO These retvals are returned as mle_retvals...but the fit wasn't ML.
     # This could be confusing someday.
     if full_output:
         x_full, fx, its, imode, smode = results
         fopt = func(np.asarray(x_full))
-        converged = (imode == 0)
-        warnflag = str(imode) + ' ' + smode
+        converged = 'True' if imode == 0 else smode
         iterations = its
         gopt = float('nan')     # Objective is non-differentiable
         hopt = float('nan')
         retvals = {
             'fopt': fopt, 'converged': converged, 'iterations': iterations,
-            'gopt': gopt, 'hopt': hopt, 'trimmed': trimmed,
-            'warnflag': warnflag}
+            'gopt': gopt, 'hopt': hopt, 'trimmed': trimmed}
 
     ### Return
     if full_output:
@@ -160,7 +158,7 @@ def _fprime_ieqcons(x_full, k_params):
     """
     Derivative of the inequality constraints
     """
-    I = np.eye(k_params)  # noqa:E741
+    I = np.eye(k_params)
     A = np.concatenate((I, I), axis=1)
     B = np.concatenate((-I, I), axis=1)
     C = np.concatenate((A, B), axis=0)

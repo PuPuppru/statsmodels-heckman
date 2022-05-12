@@ -16,7 +16,12 @@ TODO:
 
 import numpy as np
 
-from statsmodels.tools.tools import Bunch
+# temporarily here, used in return
+class Bunch(dict):
+    def __init__(self, **kw):
+        dict.__init__(self, kw)
+        self.__dict__  = self
+
 
 def partial_project(endog, exog):
     '''helper function to get linear projection or partialling out of variables
@@ -100,7 +105,7 @@ def cancorr(x1, x2, demean=True, standardize=False):
         x2 = (x2 - x2.mean(0))
 
     if standardize:
-        #std does not make a difference to canonical correlation coefficients
+        #std doesn't make a difference to canonical correlation coefficients
         x1 /= x1.std(0)
         x2 /= x2.std(0)
 

@@ -104,8 +104,10 @@ def test_skewt():
 
 
 if __name__ == '__main__':
-    import pytest
-    pytest.main([__file__, '-vvs', '-x', '--pdb'])
+    import nose
+    nose.runmodule(argv=['__main__','-vvs','-x','--pdb', '--pdb-failure'],
+                   exit=False)
+
     print('Done')
 
 

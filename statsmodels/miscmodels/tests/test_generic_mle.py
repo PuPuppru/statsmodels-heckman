@@ -11,8 +11,7 @@ import numpy as np
 from scipy import stats
 from statsmodels.base.model import GenericLikelihoodModel
 
-from numpy.testing import (assert_array_less, assert_almost_equal,
-                           assert_allclose, assert_)
+from numpy.testing import assert_array_less, assert_almost_equal, assert_allclose
 
 class MyPareto(GenericLikelihoodModel):
     '''Maximum Likelihood Estimation pareto distribution
@@ -41,7 +40,7 @@ class MyPareto(GenericLikelihoodModel):
 
     def nloglikeobs(self, params):
         #print params.shape
-        if self.fixed_params is not None:
+        if not self.fixed_params is None:
             #print 'using fixed'
             params = self.expandparams(params)
         b = params[0]
@@ -59,20 +58,13 @@ class MyPareto(GenericLikelihoodModel):
         return -logpdf
 
 
-class CheckGenericMixin:
-    # mostly smoke tests for now
+class CheckGenericMixin(object):
+    #mostly smoke tests for now
+
 
     def test_summary(self):
-        summ = self.res1.summary()
-        check_str = 'P>|t|' if self.res1.use_t else 'P>|z|'
-        assert check_str in str(summ)
-
-    def test_use_t_summary(self):
-        orig_val = self.res1.use_t
-        self.res1.use_t = True
-        summ = self.res1.summary()
-        assert 'P>|t|' in str(summ)
-        self.res1.use_t = orig_val
+        self.res1.summary()
+        #print self.res1.summary()
 
     def test_ttest(self):
         self.res1.t_test(np.eye(len(self.res1.params)))
@@ -104,7 +96,7 @@ class CheckGenericMixin:
 class TestMyPareto1(CheckGenericMixin):
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(self):
         params = [2, 0, 2]
         nobs = 100
         np.random.seed(1234)
@@ -117,12 +109,12 @@ class TestMyPareto1(CheckGenericMixin):
         mod_par.df_resid = mod_par.endog.shape[0] - mod_par.df_model
         mod_par.data.xnames = ['shape', 'loc', 'scale']
 
-        cls.mod = mod_par
-        cls.res1 = mod_par.fit(disp=None)
+        self.mod = mod_par
+        self.res1 = mod_par.fit(disp=None)
 
         # Note: possible problem with parameters close to min data boundary
         # see issue #968
-        cls.skip_bsejac = True
+        self.skip_bsejac = True
 
     def test_minsupport(self):
         # rough sanity checks for convergence
@@ -136,7 +128,7 @@ class TestMyParetoRestriction(CheckGenericMixin):
 
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(self):
         params = [2, 0, 2]
         nobs = 50
         np.random.seed(1234)
@@ -152,81 +144,8 @@ class TestMyParetoRestriction(CheckGenericMixin):
         mod_par.df_resid = mod_par.endog.shape[0] - mod_par.df_model
         mod_par.data.xnames = ['shape', 'scale']
 
-        cls.mod = mod_par
-        cls.res1 = mod_par.fit(disp=None)
+        self.mod = mod_par
+        self.res1 = mod_par.fit(disp=None)
 
         # Note: loc is fixed, no problems with parameters close to min data
-        cls.skip_bsejac = False
-
-
-class TwoPeakLLHNoExog(GenericLikelihoodModel):
-    """Fit height of signal peak over background."""
-    start_params = [10, 1000]
-    cloneattr = ['start_params', 'signal', 'background']
-    exog_names = ['n_signal', 'n_background']
-    endog_names = ['alpha']
-
-    def __init__(self, endog, exog=None, signal=None, background=None,
-                 *args, **kwargs):
-        # assume we know the shape + location of the two components,
-        # so we re-use their PDFs here
-        self.signal = signal
-        self.background = background
-        super(TwoPeakLLHNoExog, self).__init__(endog=endog, exog=exog,
-                                         *args, **kwargs)
-
-    def loglike(self, params):        # pylint: disable=E0202
-        return -self.nloglike(params)
-
-    def nloglike(self, params):
-        endog = self.endog
-        return self.nlnlike(params, endog)
-
-    def nlnlike(self, params, endog):
-        n_sig = params[0]
-        n_bkg = params[1]
-        if (n_sig < 0) or n_bkg < 0:
-            return np.inf
-        n_tot = n_bkg + n_sig
-        alpha = endog
-        sig = self.signal.pdf(alpha)
-        bkg = self.background.pdf(alpha)
-        sumlogl = np.sum(np.log((n_sig * sig) + (n_bkg * bkg)))
-        sumlogl -= n_tot
-        return -sumlogl
-
-
-class TestTwoPeakLLHNoExog:
-
-    @classmethod
-    def setup_class(cls):
-        np.random.seed(42)
-        pdf_a = stats.halfcauchy(loc=0, scale=1)
-        pdf_b = stats.uniform(loc=0, scale=100)
-
-        n_a = 50
-        n_b = 200
-        params = [n_a, n_b]
-
-        X = np.concatenate([pdf_a.rvs(size=n_a),
-                            pdf_b.rvs(size=n_b),
-                            ])[:, np.newaxis]
-        cls.X = X
-        cls.params = params
-        cls.pdf_a = pdf_a
-        cls.pdf_b = pdf_b
-
-    def test_fit(self):
-        np.random.seed(42)
-        llh_noexog = TwoPeakLLHNoExog(self.X,
-                                      signal=self.pdf_a,
-                                      background=self.pdf_b)
-
-        res = llh_noexog.fit()
-        assert_allclose(res.params, self.params, rtol=1e-1)
-        # TODO: nan if exog is None,
-        assert_(np.isnan(res.df_resid))
-        res_bs = res.bootstrap(nrep=50)
-        assert_allclose(res_bs[2].mean(0), self.params, rtol=1e-1)
-        # SMOKE test,
-        res.summary()
+        self.skip_bsejac = False

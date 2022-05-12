@@ -10,11 +10,9 @@ License: BSD-3
 import numpy as np
 from numpy.testing import assert_allclose, assert_raises
 
-from statsmodels.base._constraints import (
-    TransformRestriction,
-    fit_constrained,
-    transform_params_constraint,
-)
+from statsmodels.base._constraints import (TransformRestriction,
+                   transform_params_constraint, fit_constrained)
+
 
 if __name__ == '__main__':
 
@@ -32,7 +30,7 @@ if __name__ == '__main__':
     L = evecs[:, :k_constr]
     T = evecs[:, k_constr:]
 
-    print(T.T.dot(np.eye(k_vars)))
+    print T.T.dot(np.eye(k_vars))
 
     tr = np.column_stack((T, R.T))
 
@@ -68,7 +66,7 @@ if __name__ == '__main__':
     #tri2 = TransformRestriction(Ri2, q)
     #p = tri.expand([1,1])
     assert_raises(ValueError, TransformRestriction, Ri2, q)
-    # L does not have full row rank, calculating constant fails with Singular Matrix
+    # L doesn't have full row rank, calculating constant fails with Singular Matrix
 
     # transform data xr = T x
     np.random.seed(1)
@@ -76,7 +74,7 @@ if __name__ == '__main__':
     xr = tr1.reduce(x)
     # roundtrip
     x2 = tr1.expand(xr)
-    # this does not hold ? do not use constant? do not need it anyway ?
+    # this doesn't hold ? don't use constant? don't need it anyway ?
     #assert_allclose(x2, x, rtol=1e-14)
 
 
@@ -121,7 +119,7 @@ if __name__ == '__main__':
     print(params)
     print(res3_ols.params)
     print(res3_ols.bse)
-    # the following raises `ValueError: cannot test a constant constraint`
+    # the following raises `ValueError: can't test a constant constraint`
     #tt = res3.t_test(transf3.transf_mat, transf3.constant.squeeze())
     #print tt.sd
     cov_params3 = transf3.transf_mat.dot(res3.cov_params()).dot(transf3.transf_mat.T)
@@ -132,6 +130,8 @@ if __name__ == '__main__':
                                      transf3.R, transf3.q)
     tp = transform_params_constraint(res2.params, res2.cov_params(), transf3.R, transf3.q)
 
+
+    from statsmodels.discrete.discrete_model import Poisson
     import statsmodels.api as sm
     rand_data = sm.datasets.randhie.load()
     rand_exog = rand_data.exog.view(float).reshape(len(rand_data.exog), -1)
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     print('\nPoisson')
     print(paramsp)
     print(poisson_res.params)
-    # error because I do not use the unconstrained basic model
+    # error because I don't use the unconstrained basic model
 #    tp = transform_params_constraint(poisson_res.params, poisson_res.cov_params(), transfp.R, transfp.q)
 #    cov_params3 = transf3.transf_mat.dot(res3.cov_params()).dot(transf3.transf_mat.T)
 #    bse3 = np.sqrt(np.diag(cov_params3))

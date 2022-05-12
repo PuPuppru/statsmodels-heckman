@@ -1,16 +1,16 @@
+from __future__ import print_function
 import math
 import numpy as np
-from scipy import linalg, stats, special
+from scipy import linalg, stats
 
-from .linalg_decomp_1 import SvdArray
-
+from .linalg_decomp_1 import tiny2zero
 
 #univariate standard normal distribution
 #following from scipy.stats.distributions with adjustments
 sqrt2pi = math.sqrt(2 * np.pi)
 logsqrt2pi = math.log(sqrt2pi)
 
-class StandardNormal:
+class StandardNormal(object):
     '''Distribution of vector x, with independent distribution N(0,1)
 
     this is the same as univariate normal for pdf and logpdf
@@ -21,18 +21,18 @@ class StandardNormal:
     def rvs(self, size):
         return np.random.standard_normal(size)
     def pdf(self, x):
-        return np.exp(-x**2 * 0.5) / sqrt2pi
+        return exp(-x**2 * 0.5) / sqrt2pi
     def logpdf(self, x):
         return -x**2 * 0.5 - logsqrt2pi
     def _cdf(self, x):
         return special.ndtr(x)
     def _logcdf(self, x):
-        return np.log(special.ndtr(x))
+        return log(special.ndtr(x))
     def _ppf(self, q):
         return special.ndtri(q)
 
 
-class AffineTransform:
+class AffineTransform(object):
     '''affine full rank transformation of a multivariate distribution
 
     no dimension checking, assumes everything broadcasts correctly
@@ -75,9 +75,19 @@ class AffineTransform:
         return - self.logabsdet + self.dist.logpdf(self.invtransform(x))
 
 
+from .linalg_decomp_1 import SvdArray, OneTimeProperty
 
+class MultivariateNormal(object):
+    '''multivariate normal distribution with plain linalg
 
-class MultivariateNormalChol:
+    '''
+
+    def __init__(mean, sigma):
+        self.mean = mean
+        self.sigma = sigma
+        self.sigmainv = sigmainv
+
+class MultivariateNormalChol(object):
     '''multivariate normal distribution with cholesky decomposition of sigma
 
     ignoring mean at the beginning, maybe
@@ -126,7 +136,7 @@ class MultivariateNormalChol:
 
 
 
-class MultivariateNormal:
+class MultivariateNormal(object):
 
     def __init__(self, mean, sigma):
         self.mean = mean
@@ -264,7 +274,6 @@ print(loglike_ar1(x, 0.8))
 mch = MultivariateNormalChol(np.zeros(nobs), sigma)
 print(mch.logpdf(x))
 
-#from .linalg_decomp_1 import tiny2zero
 #print(tiny2zero(mch.cholsigmainv / mch.cholsigmainv[-1,-1])
 
 xw = mch.whiten(x)

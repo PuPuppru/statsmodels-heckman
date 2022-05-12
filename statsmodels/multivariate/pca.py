@@ -3,98 +3,87 @@
 Author: josef-pktd
 Modified by Kevin Sheppard
 """
+from __future__ import print_function, division
 
 import numpy as np
 import pandas as pd
 
+from statsmodels.compat.python import range
+from statsmodels.compat.numpy import nanmean
 from statsmodels.tools.sm_exceptions import (ValueWarning,
                                              EstimationWarning)
-from statsmodels.tools.validation import (string_like,
-                                          array_like,
-                                          bool_like,
-                                          float_like,
-                                          int_like,
-                                          )
-
 
 def _norm(x):
     return np.sqrt(np.sum(x * x))
 
 
-class PCA:
+class PCA(object):
     """
     Principal Component Analysis
 
     Parameters
     ----------
-    data : array_like
-        Variables in columns, observations in rows.
+    data : array-like
+        Variables in columns, observations in rows
     ncomp : int, optional
         Number of components to return.  If None, returns the as many as the
-        smaller of the number of rows or columns in data.
-    standardize : bool, optional
+        smaller of the number of rows or columns in data
+    standardize: bool, optional
         Flag indicating to use standardized data with mean 0 and unit
         variance.  standardized being True implies demean.  Using standardized
         data is equivalent to computing principal components from the
-        correlation matrix of data.
+        correlation matrix of data
     demean : bool, optional
         Flag indicating whether to demean data before computing principal
         components.  demean is ignored if standardize is True. Demeaning data
         but not standardizing is equivalent to computing principal components
-        from the covariance matrix of data.
+        from the covariance matrix of data
     normalize : bool , optional
-        Indicates whether to normalize the factors to have unit inner product.
+        Indicates whether th normalize the factors to have unit inner product.
         If False, the loadings will have unit inner product.
+    weights : array, optional
+        Series weights to use after transforming data according to standardize
+        or demean when computing the principal components.
     gls : bool, optional
         Flag indicating to implement a two-step GLS estimator where
         in the first step principal components are used to estimate residuals,
         and then the inverse residual variance is used as a set of weights to
         estimate the final principal components.  Setting gls to True requires
-        ncomp to be less then the min of the number of rows or columns.
-    weights : ndarray, optional
-        Series weights to use after transforming data according to standardize
-        or demean when computing the principal components.
+        ncomp to be less then the min of the number of rows or columns
     method : str, optional
-        Sets the linear algebra routine used to compute eigenvectors:
-
-        * 'svd' uses a singular value decomposition (default).
-        * 'eig' uses an eigenvalue decomposition of a quadratic form
-        * 'nipals' uses the NIPALS algorithm and can be faster than SVD when
-          ncomp is small and nvars is large. See notes about additional changes
-          when using NIPALS.
-    missing : {str, None}
-        Method for missing data.  Choices are:
-
-        * 'drop-row' - drop rows with missing values.
-        * 'drop-col' - drop columns with missing values.
-        * 'drop-min' - drop either rows or columns, choosing by data retention.
-        * 'fill-em' - use EM algorithm to fill missing value.  ncomp should be
-          set to the number of factors required.
-        * `None` raises if data contains NaN values.
+        Sets the linear algebra routine used to compute eigenvectors
+        'svd' uses a singular value decomposition (default).
+        'eig' uses an eigenvalue decomposition of a quadratic form
+        'nipals' uses the NIPALS algorithm and can be faster than SVD when
+        ncomp is small and nvars is large. See notes about additional changes
+        when using NIPALS
     tol : float, optional
-        Tolerance to use when checking for convergence when using NIPALS.
+        Tolerance to use when checking for convergence when using NIPALS
     max_iter : int, optional
-        Maximum iterations when using NIPALS.
+        Maximum iterations when using NIPALS
+    missing : string
+        Method for missing data.  Choices are
+        'drop-row' - drop rows with missing values
+        'drop-col' - drop columns with missing values
+        'drop-min' - drop either rows or columns, choosing by data retention
+        'fill-em' - use EM algorithm to fill missing value.  ncomp should be
+        set to the number of factors required
     tol_em : float
-        Tolerance to use when checking for convergence of the EM algorithm.
+        Tolerance to use when checking for convergence of the EM algorithm
     max_em_iter : int
-        Maximum iterations for the EM algorithm.
-    svd_full_matrices : bool, optional
-        If the 'svd' method is selected, this flag is used to set the parameter
-        'full_matrices' in the singular value decomposition method. Is set to
-        False by default.
+        Maximum iterations for the EM algorithm
 
     Attributes
     ----------
     factors : array or DataFrame
-        nobs by ncomp array of principal components (scores)
+        nobs by ncomp array of of principal components (scores)
     scores :  array or DataFrame
-        nobs by ncomp array of principal components - identical to factors
+        nobs by ncomp array of of principal components - identical to factors
     loadings : array or DataFrame
-        ncomp by nvar array of principal component loadings for constructing
+        ncomp by nvar array of  principal component loadings for constructing
         the factors
     coeff : array or DataFrame
-        nvar by ncomp array of principal component loadings for constructing
+        nvar by ncomp array of  principal component loadings for constructing
         the projections
     projection : array or DataFrame
         nobs by var array containing the projection of the data onto the ncomp
@@ -111,22 +100,54 @@ class PCA:
         nvar array of eigenvalues
     eigenvecs : array or DataFrame
         nvar by nvar array of eigenvectors
-    weights : ndarray
+    weights : array
         nvar array of weights used to compute the principal components,
         normalized to unit length
-    transformed_data : ndarray
+    transformed_data : array
         Standardized, demeaned and weighted data used to compute
         principal components and related quantities
-    cols : ndarray
+    cols : array
         Array of indices indicating columns used in the PCA
-    rows : ndarray
+    rows : array
         Array of indices indicating rows used in the PCA
+
+    Methods
+    -------
+    plot_scree
+        Scree plot of the eigenvalues
+    plot_rsquare
+        Individual series R-squared plotted against the number of factors
+    project
+        Compute projection for a given number of factors
+
+    Examples
+    --------
+    Basic PCA using the correlation matrix of the data
+
+    >>> import numpy as np
+    >>> from statsmodels.multivariate.pca import PCA
+    >>> x = np.random.randn(100)[:, None]
+    >>> x = x + np.random.randn(100, 100)
+    >>> pc = PCA(x)
+
+    Note that the principal components are computed using a SVD and so the
+    correlation matrix is never constructed, unless method='eig'.
+
+    PCA using the covariance matrix of the data
+
+    >>> pc = PCA(x, standardize=False)
+
+    Limiting the number of factors returned to 1 computed using NIPALS
+
+    >>> pc = PCA(x, ncomp=1, method='nipals')
+    >>> pc.factors.shape
+    (100, 1)
 
     Notes
     -----
     The default options perform principal component analysis on the
-    demeaned, unit variance version of data.  Setting standardize to False
-    will instead only demean, and setting both standardized and
+    demeanded, unit variance version of data.  Setting standardize to False will
+    instead onle demean, and setting both standardized and
     demean to False will not alter the data.
 
     Once the data have been transformed, the following relationships hold when
@@ -166,63 +187,36 @@ class PCA:
 
     where the number of factors is less than the rank of X
 
-    References
-    ----------
-    .. [*] J. Bai and S. Ng, "Determining the number of factors in approximate
+    .. [1] J. Bai and S. Ng, "Determining the number of factors in approximate
        factor models," Econometrica, vol. 70, number 1, pp. 191-221, 2002
-
-    Examples
-    --------
-    Basic PCA using the correlation matrix of the data
-
-    >>> import numpy as np
-    >>> from statsmodels.multivariate.pca import PCA
-    >>> x = np.random.randn(100)[:, None]
-    >>> x = x + np.random.randn(100, 100)
-    >>> pc = PCA(x)
-
-    Note that the principal components are computed using a SVD and so the
-    correlation matrix is never constructed, unless method='eig'.
-
-    PCA using the covariance matrix of the data
-
-    >>> pc = PCA(x, standardize=False)
-
-    Limiting the number of factors returned to 1 computed using NIPALS
-
-    >>> pc = PCA(x, ncomp=1, method='nipals')
-    >>> pc.factors.shape
-    (100, 1)
     """
 
     def __init__(self, data, ncomp=None, standardize=True, demean=True,
                  normalize=True, gls=False, weights=None, method='svd',
                  missing=None, tol=5e-8, max_iter=1000, tol_em=5e-8,
-                 max_em_iter=100, svd_full_matrices=False):
+                 max_em_iter=100, ):
         self._index = None
         self._columns = []
         if isinstance(data, pd.DataFrame):
             self._index = data.index
             self._columns = data.columns
 
-        self.data = array_like(data, "data", ndim=2)
+        self.data = np.asarray(data)
         # Store inputs
-        self._gls = bool_like(gls, "gls")
-        self._normalize = bool_like(normalize, "normalize")
-        self._svd_full_matrices = bool_like(svd_full_matrices, "svd_fm")
-        self._tol = float_like(tol, "tol")
+        self._gls = gls
+        self._normalize = normalize
+        self._tol = tol
         if not 0 < self._tol < 1:
             raise ValueError('tol must be strictly between 0 and 1')
-        self._max_iter = int_like(max_iter, "int_like")
-        self._max_em_iter = int_like(max_em_iter, "max_em_iter")
-        self._tol_em = float_like(tol_em, "tol_em")
+        self._max_iter = max_iter
+        self._max_em_iter = max_em_iter
+        self._tol_em = tol_em
 
         # Prepare data
-        self._standardize = bool_like(standardize, "standardize")
-        self._demean = bool_like(demean, "demean")
+        self._standardize = standardize
+        self._demean = demean
 
         self._nobs, self._nvar = self.data.shape
-        weights = array_like(weights, "weights", maxdim=1, optional=True)
         if weights is None:
             weights = np.ones(self._nvar)
         else:
@@ -245,28 +239,31 @@ class PCA:
             self._ncomp = min_dim
 
         self._method = method
-        # Workaround to avoid instance methods in __dict__
-        if self._method not in ('eig', 'svd', 'nipals'):
-            raise ValueError('method {0} is not known.'.format(method))
-        if self._method == 'svd':
-            self._svd_full_matrices = True
+        if self._method == 'eig':
+            self._compute_eig = self._compute_using_eig
+        elif self._method == 'svd':
+            self._compute_eig = self._compute_using_svd
+        elif self._method == 'nipals':
+            self._compute_eig = self._compute_using_nipals
+        else:
+            raise ValueError('method is not known.')
 
         self.rows = np.arange(self._nobs)
         self.cols = np.arange(self._nvar)
         # Handle missing
-        self._missing = string_like(missing, "missing", optional=True)
+        self._missing = missing
         self._adjusted_data = self.data
-        self._adjust_missing()
-
-        # Update size
-        self._nobs, self._nvar = self._adjusted_data.shape
-        if self._ncomp == np.min(self.data.shape):
-            self._ncomp = np.min(self._adjusted_data.shape)
-        elif self._ncomp > np.min(self._adjusted_data.shape):
-            raise ValueError('When adjusting for missing values, user '
-                             'provided ncomp must be no larger than the '
-                             'smallest dimension of the '
-                             'missing-value-adjusted data size.')
+        if missing is not None:
+            self._adjust_missing()
+            # Update size
+            self._nobs, self._nvar = self._adjusted_data.shape
+            if self._ncomp == np.min(self.data.shape):
+                self._ncomp = np.min(self._adjusted_data.shape)
+            elif self._ncomp > np.min(self._adjusted_data.shape):
+                raise ValueError('When adjusting for missing values, user '
+                                 'provided ncomp must be no larger than the '
+                                 'smallest dimension of the '
+                                 'missing-value-adjusted data size.')
 
         # Attributes and internal values
         self._tss = 0.0
@@ -335,11 +332,6 @@ class PCA:
                 self.cols = np.where(drop_col_index)[0]
         elif self._missing == 'fill-em':
             self._adjusted_data = self._fill_missing_em()
-        elif self._missing is None:
-            if not np.isfinite(self._adjusted_data).all():
-                raise ValueError("""\
-data contains non-finite values (inf, NaN). You should drop these values or
-use one of the methods for adjusting data for missing-values.""")
         else:
             raise ValueError('missing method is not known.')
 
@@ -349,15 +341,13 @@ use one of the methods for adjusting data for missing-values.""")
 
         # Check adjusted data size
         if self._adjusted_data.size == 0:
-            raise ValueError('Removal of missing values has eliminated '
-                             'all data.')
+            raise ValueError('Removal of missing values has eliminated all data.')
 
     def _compute_gls_weights(self):
         """
         Computes GLS weights based on percentage of data fit
         """
-        projection = np.asarray(self.project(transform=False))
-        errors = self.transformed_data - projection
+        errors = self.transformed_data - np.asarray(self.projection)
         if self._ncomp == self._nvar:
             raise ValueError('gls can only be used when ncomp < nvar '
                              'so that residuals have non-zero variance')
@@ -370,9 +360,10 @@ use one of the methods for adjusting data for missing-values.""")
             eff_series = int(np.round(eff_series_perc * nvar))
             import warnings
 
-            warn = f"""\
-Many series are being down weighted by GLS. Of the {nvar} series, the GLS
-estimates are based on only {eff_series} (effective) series."""
+            warn = 'Many series are being down weighted by GLS. Of the ' \
+                   '{original} series, the GLS estimates are based on only ' \
+                   '{effective} (effective) ' \
+                   'series.'.format(original=nvar, effective=eff_series)
             warnings.warn(warn, EstimationWarning)
 
         self.weights = weights
@@ -418,8 +409,8 @@ estimates are based on only {eff_series} (effective) series."""
         if np.all(np.isnan(adj_data)):
             return np.empty(adj_data.shape[1]).fill(np.nan)
 
-        self._mu = np.nanmean(adj_data, axis=0)
-        self._sigma = np.sqrt(np.nanmean((adj_data - self._mu) ** 2.0, axis=0))
+        self._mu = nanmean(adj_data, axis=0)
+        self._sigma = np.sqrt(nanmean((adj_data - self._mu) ** 2.0, axis=0))
         if self._standardize:
             data = (adj_data - self._mu) / self._sigma
         elif self._demean:
@@ -428,23 +419,10 @@ estimates are based on only {eff_series} (effective) series."""
             data = adj_data
         return data / np.sqrt(self.weights)
 
-    def _compute_eig(self):
-        """
-        Wrapper for actual eigenvalue method
-
-        This is a workaround to avoid instance methods in __dict__
-        """
-        if self._method == 'eig':
-            return self._compute_using_eig()
-        elif self._method == 'svd':
-            return self._compute_using_svd()
-        else:  # self._method == 'nipals'
-            return self._compute_using_nipals()
-
     def _compute_using_svd(self):
         """SVD method to compute eigenvalues and eigenvecs"""
         x = self.transformed_data
-        u, s, v = np.linalg.svd(x, full_matrices=self._svd_full_matrices)
+        u, s, v = np.linalg.svd(x)
         self.eigenvals = s ** 2.0
         self.eigenvecs = v.T
 
@@ -457,8 +435,7 @@ estimates are based on only {eff_series} (effective) series."""
 
     def _compute_using_nipals(self):
         """
-        NIPALS implementation to compute small number of eigenvalues
-        and eigenvectors
+        NIPALS implementation to compute small number of eigenvalues and eigenvectors
         """
         x = self.transformed_data
         if self._ncomp > 1:
@@ -512,7 +489,7 @@ estimates are based on only {eff_series} (effective) series."""
         mask = np.isnan(data)
 
         # 4. Compute mean
-        mu = np.nanmean(data, 0)
+        mu = nanmean(data, 0)
 
         # 5. Replace missing with mean
         projection = np.ones((self._nobs, 1)) * mu
@@ -530,8 +507,7 @@ estimates are based on only {eff_series} (effective) series."""
             self._compute_eig()
             # Call function to compute factors and projection
             self._compute_pca_from_eig()
-            projection = np.asarray(self.project(transform=False,
-                                                 unweight=False))
+            projection = np.asarray(self.project(transform=False, unweight=False))
             projection_masked = projection[mask]
             data[mask] = projection_masked
             delta = last_projection_masked - projection_masked
@@ -560,10 +536,9 @@ estimates are based on only {eff_series} (effective) series."""
             if num_good < self._ncomp:
                 import warnings
 
-                warnings.warn('Only {num:d} eigenvalues are positive.  '
-                              'This is the maximum number of components '
-                              'that can be extracted.'.format(num=num_good),
-                              EstimationWarning)
+                warn = 'Only {num:d} eigenvalues are positive.  The is the ' \
+                       'maximum number of components that can be extracted.'
+                warnings.warn(warn.format(num=num_good), EstimationWarning)
 
                 self._ncomp = num_good
                 vals[num_good:] = np.finfo(np.float64).tiny
@@ -585,8 +560,7 @@ estimates are based on only {eff_series} (effective) series."""
         Final statistics to compute
         """
         # TSS and related calculations
-        # TODO: This needs careful testing, with and without weights,
-        #   gls, standardized and demean
+        # TODO: This needs careful testing, with and without weights, gls, standardized and demean
         weights = self.weights
         ss_data = self.transformed_data * np.sqrt(weights)
         self._tss_indiv = np.sum(ss_data ** 2, 0)
@@ -623,25 +597,25 @@ estimates are based on only {eff_series} (effective) series."""
 
     def project(self, ncomp=None, transform=True, unweight=True):
         """
-        Project series onto a specific number of factors.
+        Project series onto a specific number of factors
 
         Parameters
         ----------
         ncomp : int, optional
             Number of components to use.  If omitted, all components
             initially computed are used.
-        transform : bool, optional
-            Flag indicating whether to return the projection in the original
-            space of the data (True, default) or in the space of the
-            standardized/demeaned data.
-        unweight : bool, optional
-            Flag indicating whether to undo the effects of the estimation
-            weights.
 
         Returns
         -------
-        array_like
-            The nobs by nvar array of the projection onto ncomp factors.
+        projection : array
+            nobs by nvar array of the projection onto ncomp factors
+        transform : bool
+            Flag indicating whether to return the projection in the original
+            space of the data (True, default) or in the space of the
+            standardized/demeaned data
+        unweight : bool
+            Flag indicating whether to undo the effects of the estimation
+            weights
 
         Notes
         -----
@@ -708,8 +682,7 @@ estimates are based on only {eff_series} (effective) series."""
         self.ic = pd.DataFrame(self.ic, columns=['IC_p1', 'IC_p2', 'IC_p3'])
         self.ic.index.name = 'ncomp'
 
-    def plot_scree(self, ncomp=None, log_scale=True,
-                   cumulative=False, ax=None):
+    def plot_scree(self, ncomp=None, log_scale=True, cumulative=False, ax=None):
         """
         Plot of the ordered eigenvalues
 
@@ -723,14 +696,14 @@ estimates are based on only {eff_series} (effective) series."""
         cumulative : bool, optional
             Flag indicating whether to plot the eigenvalues or cumulative
             eigenvalues
-        ax : AxesSubplot, optional
+        ax : Matplotlib axes instance, optional
             An axes on which to draw the graph.  If omitted, new a figure
             is created
 
         Returns
         -------
-        matplotlib.figure.Figure
-            The handle to the figure.
+        fig : figure
+            Handle to the figure
         """
         import statsmodels.graphics.utils as gutils
 
@@ -770,21 +743,21 @@ estimates are based on only {eff_series} (effective) series."""
 
     def plot_rsquare(self, ncomp=None, ax=None):
         """
-        Box plots of the individual series R-square against the number of PCs.
+        Box plots of the individual series R-square against the number of PCs
 
         Parameters
         ----------
         ncomp : int, optional
             Number of components ot include in the plot.  If None, will
-            plot the minimum of 10 or the number of computed components.
-        ax : AxesSubplot, optional
+            plot the minimum of 10 or the number of computed components
+        ax : Matplotlib axes instance, optional
             An axes on which to draw the graph.  If omitted, new a figure
-            is created.
+            is created
 
         Returns
         -------
-        matplotlib.figure.Figure
-            The handle to the figure.
+        fig : figure
+            Handle to the figure
         """
         import statsmodels.graphics.utils as gutils
 
@@ -807,16 +780,16 @@ estimates are based on only {eff_series} (effective) series."""
 def pca(data, ncomp=None, standardize=True, demean=True, normalize=True,
         gls=False, weights=None, method='svd'):
     """
-    Perform Principal Component Analysis (PCA).
+    Principal Component Analysis
 
     Parameters
     ----------
-    data : ndarray
+    data : array
         Variables in columns, observations in rows.
     ncomp : int, optional
         Number of components to return.  If None, returns the as many as the
         smaller to the number of rows or columns of data.
-    standardize : bool, optional
+    standardize: bool, optional
         Flag indicating to use standardized data with mean 0 and unit
         variance.  standardized being True implies demean.
     demean : bool, optional
@@ -825,14 +798,14 @@ def pca(data, ncomp=None, standardize=True, demean=True, normalize=True,
     normalize : bool , optional
         Indicates whether th normalize the factors to have unit inner
         product.  If False, the loadings will have unit inner product.
+    weights : array, optional
+        Series weights to use after transforming data according to standardize
+        or demean when computing the principal components.
     gls : bool, optional
         Flag indicating to implement a two-step GLS estimator where
         in the first step principal components are used to estimate residuals,
         and then the inverse residual variance is used as a set of weights to
         estimate the final principal components
-    weights : ndarray, optional
-        Series weights to use after transforming data according to standardize
-        or demean when computing the principal components.
     method : str, optional
         Determines the linear algebra routine uses.  'eig', the default,
         uses an eigenvalue decomposition. 'svd' uses a singular value
@@ -840,31 +813,31 @@ def pca(data, ncomp=None, standardize=True, demean=True, normalize=True,
 
     Returns
     -------
-    factors : {ndarray, DataFrame}
-        Array (nobs, ncomp) of principal components (also known as scores).
-    loadings : {ndarray, DataFrame}
-        Array (ncomp, nvar) of principal component loadings for constructing
-        the factors.
-    projection : {ndarray, DataFrame}
-        Array (nobs, nvar) containing the projection of the data onto the ncomp
-        estimated factors.
-    rsquare : {ndarray, Series}
-        Array (ncomp,) where the element in the ith position is the R-square
+    factors : array or DataFrame
+        nobs by ncomp array of of principal components (also known as scores)
+    loadings : array or DataFrame
+        ncomp by nvar array of  principal component loadings for constructing
+        the factors
+    projection : array or DataFrame
+        nobs by var array containing the projection of the data onto the ncomp
+        estimated factors
+    rsquare : array or Series
+        ncomp array where the element in the ith position is the R-square
         of including the fist i principal components.  The values are
         calculated on the transformed data, not the original data.
-    ic : {ndarray, DataFrame}
-        Array (ncomp, 3) containing the Bai and Ng (2003) Information
+    ic : array or DataFrame
+        ncomp by 3 array containing the Bai and Ng (2003) Information
         criteria.  Each column is a different criteria, and each row
         represents the number of included factors.
-    eigenvals : {ndarray, Series}
-        Array of eigenvalues (nvar,).
-    eigenvecs : {ndarray, DataFrame}
-        Array of eigenvectors. (nvar, nvar).
+    eigenvals : array or Series
+        nvar array of eigenvalues
+    eigenvecs : array or DataFrame
+        nvar by nvar array of eigenvectors
 
     Notes
     -----
-    This is a simple function wrapper around the PCA class. See PCA for
-    more information and additional methods.
+    This is a simple function wrapper around the PCA class. See PCA for more information
+    and additional methods.
     """
     pc = PCA(data, ncomp=ncomp, standardize=standardize, demean=demean,
              normalize=normalize, gls=gls, weights=weights, method=method)

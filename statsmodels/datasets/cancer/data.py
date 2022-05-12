@@ -1,5 +1,4 @@
 """Breast Cancer Data"""
-from statsmodels.datasets import utils as du
 
 __docformat__ = 'restructuredtext'
 
@@ -27,11 +26,9 @@ NOTE        = """::
 
 """
 
-
-def load_pandas():
-    data = _get_data()
-    return du.process_pandas(data, endog_idx=0, exog_idx=None)
-
+import numpy as np
+from statsmodels.datasets import utils as du
+from os.path import dirname, abspath
 
 def load():
     """
@@ -39,11 +36,24 @@ def load():
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
-    return load_pandas()
+    data = _get_data()
+    ##### SET THE INDICES #####
+    #NOTE: None for exog_idx is the complement of endog_idx
+    return du.process_recarray(data, endog_idx=0, exog_idx=None, dtype=float)
 
+def load_pandas():
+    data = _get_data()
+    ##### SET THE INDICES #####
+    #NOTE: None for exog_idx is the complement of endog_idx
+    return du.process_recarray_pandas(data, endog_idx=0, exog_idx=None,
+                                      dtype=float)
 
 def _get_data():
-    return du.load_csv(__file__, 'cancer.csv', convert_float=True)
+    filepath = dirname(abspath(__file__))
+    ##### EDIT THE FOLLOWING TO POINT TO DatasetName.csv #####
+    with open(filepath + '/cancer.csv', 'rb') as f:
+        data = np.recfromtxt(f, delimiter=",", names=True, dtype=float)
+    return data

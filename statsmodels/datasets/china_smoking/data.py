@@ -1,5 +1,4 @@
 """Smoking and lung cancer in eight cities in China."""
-from statsmodels.datasets import utils as du
 
 __docformat__ = 'restructuredtext'
 
@@ -27,6 +26,10 @@ NOTE        = """::
         lung_cancer - yes or no, according to a person's lung cancer status
 """
 
+import pandas as pd
+from statsmodels.datasets import utils
+import os
+
 
 def load_pandas():
     """
@@ -34,14 +37,13 @@ def load_pandas():
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
-    raw_data = du.load_csv(__file__, 'china_smoking.csv')
-    data = raw_data.set_index('Location')
-    dset = du.Dataset(data=data, title="Smoking and lung cancer in Chinese regions")
-    dset.raw_data = raw_data
-    return dset
+
+    filepath = os.path.dirname(os.path.abspath(__file__))
+    data = pd.read_csv(os.path.join(filepath + '/china_smoking.csv'), index_col="Location")
+    return utils.Dataset(data=data, title="Smoking and lung cancer in Chinese regions")
 
 
 def load():
@@ -50,7 +52,8 @@ def load():
 
     Returns
     -------
-    Dataset
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
-    return load_pandas()
+    recarray = load_pandas().data.to_records()
+    return utils.Dataset(data=recarray, title="Smoking and lung cancer in Chinese regions")

@@ -4,6 +4,8 @@
 
 author: Yichuan Liu
 """
+from __future__ import division
+
 import numpy as np
 from numpy.linalg import svd
 import scipy
@@ -16,35 +18,33 @@ from .multivariate_ols import multivariate_stats
 
 class CanCorr(Model):
     """
-    Canonical correlation analysis using singular value decomposition
+    Canonical correlation analysis using singluar value decomposition
 
     For matrices exog=x and endog=y, find projections x_cancoef and y_cancoef
     such that:
-
         x1 = x * x_cancoef, x1' * x1 is identity matrix
         y1 = y * y_cancoef, y1' * y1 is identity matrix
-
     and the correlation between x1 and y1 is maximized.
 
     Attributes
-    ----------
-    endog : ndarray
+    -----------
+    endog : array
         See Parameters.
-    exog : ndarray
+    exog : array
         See Parameters.
-    cancorr : ndarray
+    cancorr : array
         The canonical correlation values
-    y_cancoeff : ndarray
-        The canonical coefficients for endog
-    x_cancoeff : ndarray
+    y_cancoeff: array
+        The canonical coeefficients for endog
+    x_cancoeff: array
         The canonical coefficients for exog
 
     References
     ----------
-    .. [*] http://numerical.recipes/whp/notes/CanonCorrBySVD.pdf
-    .. [*] http://www.csun.edu/~ata20315/psy524/docs/Psy524%20Lecture%208%20CC.pdf
-    .. [*] http://www.mathematica-journal.com/2014/06/canonical-correlation-analysis/
-    """  # noqa:E501
+    .. [1] http://numerical.recipes/whp/notes/CanonCorrBySVD.pdf
+    .. [2] http://www.csun.edu/~ata20315/psy524/docs/Psy524%20Lecture%208%20CC.pdf
+    .. [3] http://www.mathematica-journal.com/2014/06/canonical-correlation-analysis/
+    """
     def __init__(self, endog, exog, tolerance=1e-8, missing='none', hasconst=None, **kwargs):
         super(CanCorr, self).__init__(endog, exog, missing=missing,
                                       hasconst=hasconst, **kwargs)
@@ -102,6 +102,7 @@ class CanCorr(Model):
         Returns
         -------
         CanCorrTestResults instance
+
         """
         nobs, k_yvar = self.endog.shape
         nobs, k_xvar = self.exog.shape
@@ -150,12 +151,12 @@ class CanCorr(Model):
         return CanCorrTestResults(stats, stats_mv)
 
 
-class CanCorrTestResults:
+class CanCorrTestResults(object):
     """
     Canonical correlation results class
 
     Attributes
-    ----------
+    -----------
     stats : DataFrame
         Contain statistical tests results for each canonical correlation
     stats_mv : DataFrame

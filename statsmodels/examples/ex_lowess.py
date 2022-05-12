@@ -7,18 +7,16 @@ Author: Chris Jordan Squire
 extracted from test suite by josef-pktd
 """
 
-import os
-
+from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-import statsmodels.nonparametric.tests.results
+
+lowess = sm.nonparametric.lowess
 
 # this is just to check direct import
 import statsmodels.nonparametric.smoothers_lowess
 statsmodels.nonparametric.smoothers_lowess.lowess
-
-lowess = sm.nonparametric.lowess
 
 x = np.arange(20.)
 
@@ -62,10 +60,12 @@ plt.plot(y, 'o')
 plt.plot(actual_lowess[:,1])
 plt.plot(expected_lowess[:,1])
 
+import os.path
+import statsmodels.nonparametric.tests.results
 rpath = os.path.split(statsmodels.nonparametric.tests.results.__file__)[0]
 rfile = os.path.join(rpath, 'test_lowess_frac.csv')
 test_data = np.genfromtxt(open(rfile, 'rb'),
-                          delimiter=',', names=True)
+                                  delimiter = ',', names = True)
 expected_lowess_23 = np.array([test_data['x'], test_data['out_2_3']]).T
 expected_lowess_15 = np.array([test_data['x'], test_data['out_1_5']]).T
 

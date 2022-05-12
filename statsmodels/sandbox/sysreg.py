@@ -1,12 +1,13 @@
+from statsmodels.compat.python import iterkeys
 from statsmodels.regression.linear_model import GLS
 import numpy as np
 from statsmodels.base.model import LikelihoodModelResults
 from scipy import sparse
+from statsmodels.compat.numpy import np_matrix_rank
 
-# http://www.irisa.fr/aladin/wg-statlin/WORKSHOPS/RENNES02/SLIDES/Foschi.pdf
+#http://www.irisa.fr/aladin/wg-statlin/WORKSHOPS/RENNES02/SLIDES/Foschi.pdf
 
 __all__ = ['SUR', 'Sem2SLS']
-
 
 #probably should have a SystemModel superclass
 # TODO: does it make sense of SUR equations to have
@@ -15,7 +16,7 @@ __all__ = ['SUR', 'Sem2SLS']
 #TODO: make a dictionary that holds equation specific information
 #rather than these cryptic lists?  Slower to get a dict value?
 #TODO: refine sigma definition
-class SUR:
+class SUR(object):
     """
     Seemingly Unrelated Regression
 
@@ -24,7 +25,7 @@ class SUR:
     sys : list
         [endog1, exog1, endog2, exog2,...] It will be of length 2 x M,
         where M is the number of equations endog = exog.
-    sigma : array_like
+    sigma : array-like
         M x M array where sigma[i,j] is the covariance between equation i and j
     dfk : None, 'dfk1', or 'dfk2'
         Default is None.  Correction for the degrees of freedom
@@ -33,19 +34,19 @@ class SUR:
 
     Attributes
     ----------
-    cholsigmainv : ndarray
+    cholsigmainv : array
         The transpose of the Cholesky decomposition of `pinv_wexog`
-    df_model : ndarray
+    df_model : array
         Model degrees of freedom of each equation. p_{m} - 1 where p is
         the number of regressors for each equation m and one is subtracted
         for the constant.
-    df_resid : ndarray
+    df_resid : array
         Residual degrees of freedom of each equation. Number of observations
         less the number of parameters.
-    endog : ndarray
+    endog : array
         The LHS variables for each equation in the system.
         It is a M x nobs array where M is the number of equations.
-    exog : ndarray
+    exog : array
         The RHS variable for each equation in the system.
         It is a nobs x sum(p_{m}) array.  Which is just each
         RHS array stacked next to each other in columns.
@@ -57,25 +58,25 @@ class SUR:
         iteratively.
     nobs : float
         The number of observations of the equations.
-    normalized_cov_params : ndarray
+    normalized_cov_params : array
         sum(p_{m}) x sum(p_{m}) array
         :math:`\\left[X^{T}\\left(\\Sigma^{-1}\\otimes\\boldsymbol{I}\\right)X\\right]^{-1}`
-    pinv_wexog : ndarray
+    pinv_wexog : array
         The pseudo-inverse of the `wexog`
-    sigma : ndarray
+    sigma : array
         M x M covariance matrix of the cross-equation disturbances. See notes.
     sp_exog : CSR sparse matrix
         Contains a block diagonal sparse matrix of the design so that
         exog1 ... exogM are on the diagonal.
-    wendog : ndarray
+    wendog : array
         M * nobs x 1 array of the endogenous variables whitened by
         `cholsigmainv` and stacked into a single column.
-    wexog : ndarray
+    wexog : array
         M*nobs x sum(p_{m}) array of the whitened exogenous variables.
 
     Notes
     -----
-    All individual equations are assumed to be well-behaved, homoskedastic
+    All individual equations are assumed to be well-behaved, homoeskedastic
     iid errors.  This is basically an extension of GLS, using sparse matrices.
 
     .. math:: \\Sigma=\\left[\\begin{array}{cccc}
@@ -111,11 +112,11 @@ exogenous variables.  Got length %s" % len(sys))
         self.endog = endog
         self.nobs = float(self.endog[0].shape[0]) # assumes all the same length
 
-        # Degrees of Freedom
+# Degrees of Freedom
         df_resid = []
         df_model = []
-        [df_resid.append(self.nobs - np.linalg.matrix_rank(_)) for _ in sys[1::2]]
-        [df_model.append(np.linalg.matrix_rank(_) - 1) for _ in sys[1::2]]
+        [df_resid.append(self.nobs - np_matrix_rank(_)) for _ in sys[1::2]]
+        [df_model.append(np_matrix_rank(_) - 1) for _ in sys[1::2]]
         self.df_resid = np.asarray(df_resid)
         self.df_model = np.asarray(df_model)
 
@@ -130,7 +131,7 @@ exogenous variables.  Got length %s" % len(sys))
 # Deal with sigma, check shape earlier if given
         if np.any(sigma):
             sigma = np.asarray(sigma) # check shape
-        elif sigma is None:
+        elif sigma == None:
             resids = []
             for i in range(M):
                 resids.append(GLS(endog[i],exog[:,
@@ -177,7 +178,7 @@ exogenous variables.  Got length %s" % len(sys))
                     div[i+j] = nobs - np.max(self.df_model[i]+1,
                         self.df_model[j]+1)
             div.reshape(M,M)
-# does not handle (#,)
+# doesn't handle (#,)
         self.cholsigmainv = np.linalg.cholesky(np.linalg.pinv(sig/div)).T
         return sig/div
 
@@ -186,7 +187,7 @@ exogenous variables.  Got length %s" % len(sys))
         SUR whiten method.
 
         Parameters
-        ----------
+        -----------
         X : list of arrays
             Data to be whitened.
 
@@ -196,6 +197,7 @@ exogenous variables.  Got length %s" % len(sys))
         ``np.dot(np.kron(cholsigmainv,np.eye(M)),np.diag(X))``
 
         If X is the endogenous LHS of the system.
+
         """
         nobs = self.nobs
         if X is self.endog: # definitely not a robust check
@@ -236,7 +238,7 @@ exogenous variables.  Got length %s" % len(sys))
         while igls and (np.any(np.abs(conv[-2] - conv[-1]) > tol)) and \
                 (self.iterations < maxiter):
             fittedvalues = (self.sp_exog*beta).reshape(M,-1)
-            resids = self.endog - fittedvalues # do not attach results yet
+            resids = self.endog - fittedvalues # don't attach results yet
             self.sigma = self._compute_sigma(resids) # need to attach for compute?
             self.wendog = self.whiten(self.endog)
             self.wexog = self.whiten(self.sp_exog)
@@ -255,7 +257,7 @@ exogenous variables.  Got length %s" % len(sys))
 #TODO: Should just have a general 2SLS estimator to subclass
 # for IV, FGLS, etc.
 # Also should probably have SEM class and estimators as subclasses
-class Sem2SLS:
+class Sem2SLS(object):
     """
     Two-Stage Least Squares for Simultaneous equations
 
@@ -267,10 +269,10 @@ class Sem2SLS:
     indep_endog : dict
         A dictionary mapping the equation to the column numbers of the
         the independent endogenous regressors in each equation.
-        It is assumed that the system is entered as broken up into
+        It is assumed that the system is inputed as broken up into
         LHS and RHS. For now, the values of the dict have to be sequences.
         Note that the keys for the equations should be zero-indexed.
-    instruments : ndarray
+    instruments : array
         Array of the exogenous independent variables.
 
     Notes
@@ -288,14 +290,14 @@ exogenous variables.  Got length %s" % len(sys))
 # The lists are probably a bad idea
         self.endog = sys[::2]   # these are just list containers
         self.exog = sys[1::2]
-        self._K = [np.linalg.matrix_rank(_) for _ in sys[1::2]]
+        self._K = [np_matrix_rank(_) for _ in sys[1::2]]
 #        fullexog = np.column_stack((_ for _ in self.exog))
 
         self.instruments = instruments
 
         # Keep the Y_j's in a container to get IVs
         instr_endog = {}
-        [instr_endog.setdefault(_,[]) for _ in indep_endog.keys()]
+        [instr_endog.setdefault(_,[]) for _ in iterkeys(indep_endog)]
 
         for eq_key in indep_endog:
             for varcol in indep_endog[eq_key]:
@@ -311,9 +313,8 @@ exogenous variables.  Got length %s" % len(sys))
                 iter(indep_endog[eq_key])
             except:
 #                eq_key = [eq_key]
-                raise TypeError("The values of the indep_exog dict must be "
-                                "iterable. Got type %s for converter %s"
-                                % (type(indep_endog[eq_key]), eq_key))
+                raise TypeError("The values of the indep_exog dict must be\
+ iterable. Got type %s for converter %s" % (type(del_col)))
 #            for del_col in indep_endog[eq_key]:
 #                fullexog = np.delete(fullexog,  _col_map[eq_key]+del_col, 1)
 #                _col_map[eq_key+1:] -= 1

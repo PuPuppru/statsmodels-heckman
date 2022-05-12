@@ -1,3 +1,4 @@
+from statsmodels.compat.python import range
 import warnings
 from statsmodels.tools.parallel import parallel_func
 from numpy import arange, testing

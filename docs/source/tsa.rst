@@ -27,24 +27,28 @@ Currently, functions and classes have to be imported from the corresponding modu
 the main classes will be made available in the statsmodels.tsa namespace. The module
 structure is within statsmodels.tsa is
 
-- stattools : empirical properties and tests, acf, pacf, granger-causality,
-  adf unit root test, kpss test, bds test, ljung-box test and others.
-- ar_model : univariate autoregressive process, estimation with conditional
-  and exact maximum likelihood and conditional least-squares
-- arima.model : univariate ARIMA process, estimation with alternative methods
-- statespace : Comprehensive statespace model specification and estimation. See
-  the :ref:`statespace documentation <statespace>`.
-- vector_ar, var : vector autoregressive process (VAR) and vector error correction
-  models, estimation, impulse response analysis, forecast error variance decompositions,
-  and data visualization tools. See the :ref:`vector_ar documentation <var>`.
-- arma_process : properties of arma processes with given parameters, this
-  includes tools to convert between ARMA, MA and AR representation as well as
-  acf, pacf, spectral density, impulse response function and similar
-- sandbox.tsa.fftarma : similar to arma_process but working in frequency domain
-- tsatools : additional helper functions, to create arrays of lagged variables,
-  construct regressors for trend, detrend and similar.
-- filters : helper function for filtering time series
-- regime_switching : Markov switching dynamic regression and autoregression models
+ - stattools : empirical properties and tests, acf, pacf, granger-causality,
+   adf unit root test, kpss test, bds test, ljung-box test and others.
+ - ar_model : univariate autoregressive process, estimation with conditional
+   and exact maximum likelihood and conditional least-squares
+ - arima_model : univariate ARMA process, estimation with conditional
+   and exact maximum likelihood and conditional least-squares
+ - vector_ar, var : vector autoregressive process (VAR) estimation models,
+   impulse response analysis, forecast error variance decompositions, and data
+   visualization tools
+ - kalmanf : estimation classes for ARMA and other models with exact MLE using
+   Kalman Filter
+ - arma_process : properties of arma processes with given parameters, this
+   includes tools to convert between ARMA, MA and AR representation as well as
+   acf, pacf, spectral density, impulse response function and similar
+ - sandbox.tsa.fftarma : similar to arma_process but working in frequency domain
+ - tsatools : additional helper functions, to create arrays of lagged variables,
+   construct regressors for trend, detrend and similar.
+ - filters : helper function for filtering time series
+ - regime_switching : Markov switching dynamic regression and autoregression
+   models
+
+
 
 Some additional functions that are also useful for time series analysis are in
 other parts of statsmodels, for example additional statistical tests.
@@ -69,22 +73,16 @@ Descriptive Statistics and Tests
    stattools.pacf
    stattools.pacf_yw
    stattools.pacf_ols
-   stattools.pacf_burg
    stattools.ccovf
    stattools.ccf
+   stattools.periodogram
    stattools.adfuller
    stattools.kpss
-   stattools.range_unit_root_test
-   stattools.zivot_andrews
    stattools.coint
    stattools.bds
    stattools.q_stat
-   stattools.breakvar_heteroskedasticity_test
    stattools.grangercausalitytests
    stattools.levinson_durbin
-   stattools.innovations_algo
-   stattools.innovations_filter
-   stattools.levinson_durbin_pacf
    stattools.arma_order_select_ic
    x13.x13_arima_select_order
    x13.x13_arima_analysis
@@ -95,91 +93,72 @@ Estimation
 The following are the main estimation classes, which can be accessed through
 statsmodels.tsa.api and their result classes
 
-Univariate Autoregressive Processes (AR)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The basic autoregressive model in Statsmodels is:
+Univariate Autogressive Processes (AR)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. currentmodule:: statsmodels.tsa
 
 .. autosummary::
    :toctree: generated/
 
-   ar_model.AutoReg
-   ar_model.AutoRegResults
-   ar_model.ar_select_order
-
-The `ar_model.AutoReg` model estimates parameters using conditional MLE (OLS),
-and supports exogenous regressors (an AR-X model) and seasonal effects.
-
-AR-X and related models can also be fitted with the `arima.ARIMA` class and the
-`SARIMAX` class (using full MLE via the Kalman Filter).
+   ar_model.AR
+   ar_model.ARResults
 
 
-Autoregressive Moving-Average Processes (ARMA) and Kalman Filter
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Basic ARIMA model and results classes are as follows:
+Autogressive Moving-Average Processes (ARMA) and Kalman Filter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. currentmodule:: statsmodels.tsa
 
 .. autosummary::
    :toctree: generated/
 
-   arima.model.ARIMA
-   arima.model.ARIMAResults
+   arima_model.ARMA
+   arima_model.ARMAResults
+   arima_model.ARIMA
+   arima_model.ARIMAResults
+   kalmanf.kalmanfilter.KalmanFilter
 
-This model allows estimating parameters by various methods (including
-conditional MLE via the Hannan-Rissanen method and full MLE via the Kalman
-filter). It is a special case of the `SARIMAX` model, and it includes a large
-number of inherited features from the :ref:`state space <statespace>` models
-(including prediction / forecasting, residual diagnostics, simulation and
-impulse responses, etc.).
-
-Exponential Smoothing
-~~~~~~~~~~~~~~~~~~~~~
-
-Linear and non-linear exponential smoothing models are available:
-
-.. currentmodule:: statsmodels.tsa.holtwinters
+Vector Autogressive Processes (VAR)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autosummary::
    :toctree: generated/
 
-   ExponentialSmoothing
-   SimpleExpSmoothing
-   Holt
-   HoltWintersResults
+   vector_ar.var_model.VAR
+   vector_ar.var_model.VARResults
+   vector_ar.dynamic.DynamicVAR
 
-Separately, linear and non-linear exponential smoothing models have also been
-implemented based on the "innovations" state space approach. In addition to the
-usual support for parameter fitting, in-sample prediction, and out-of-sample
-forecasting, these models also support prediction intervals, simulation, and
-more.
+.. seealso:: tutorial :ref:`VAR documentation <var>`
 
 .. currentmodule:: statsmodels.tsa
 
-.. autosummary::
-   :toctree: generated/
+Vector Autogressive Processes (VAR)
+"""""""""""""""""""""""""""""""""""
 
-   exponential_smoothing.ets.ETSModel
-   exponential_smoothing.ets.ETSResults
-
-Finally, linear exponential smoothing models have also been separately
-implemented as a special case of the general state space framework (this is
-separate from the "innovations" state space approach described above). Although
-this approach does not allow for the non-linear (multiplicative) exponential
-smoothing models, it includes all features of :ref:`state space <statespace>`
-models (including prediction / forecasting, residual diagnostics, simulation
-and impulse responses, etc.).
-
-.. currentmodule:: statsmodels.tsa
+Besides estimation, several process properties and additional results after
+estimation are available for vector autoregressive processes.
 
 .. autosummary::
    :toctree: generated/
 
-   statespace.exponential_smoothing.ExponentialSmoothing
-   statespace.exponential_smoothing.ExponentialSmoothingResults
+   vector_ar.var_model.VAR
+   vector_ar.var_model.VARProcess
+   vector_ar.var_model.VARResults
+   vector_ar.irf.IRAnalysis
+   vector_ar.var_model.FEVD
+   vector_ar.dynamic.DynamicVAR
+
+.. seealso:: tutorial :ref:`VAR documentation <var>`
+
+Regime switching models
+"""""""""""""""""""""""
+
+.. autosummary::
+   :toctree: generated/
+
+   regime_switching.markov_regression.MarkovRegression
+   regime_switching.markov_autoregression.MarkovAutoregression
 
 ARMA Process
 """"""""""""
@@ -207,252 +186,57 @@ process for given lag-polynomials.
    arima_process.lpol_fima
    arima_process.lpol_sdiff
 
-.. currentmodule:: statsmodels.sandbox.tsa.fftarma
+.. currentmodule:: statsmodels
 
 .. autosummary::
    :toctree: generated/
 
-   ArmaFft
+   sandbox.tsa.fftarma.ArmaFft
 
 .. currentmodule:: statsmodels.tsa
-
-Autoregressive Distributed Lag (ARDL) Models
-""""""""""""""""""""""""""""""""""""""""""""
-Autoregressive Distributed Lag models span the space between
-autoregressive models (:class:`~statsmodels.tsa.ar_model.AutoReg`)
-and vector autoregressive models (:class:`~statsmodels.tsa.vector_ar.VAR`).
-
-.. currentmodule:: statsmodels.tsa
-
-.. autosummary::
-   :toctree: generated/
-
-   ardl.ARDL
-   ardl.ARDLResults
-   ardl.ardl_select_order
-   ardl.ARDLOrderSelectionResults
-
-The `ardl.ARDL` model estimates parameters using conditional MLE (OLS)
-and allows for both simple deterministic terms (trends and seasonal
-dummies) as well as complex deterministics using a
-:class:`~statsmodels.tsa.deterministic.DeterministicProcess`.
-
-AR-X and related models can also be fitted with
-:class:`~statsmodels.tsa.statespace.sarimax.SARIMAX` class (using full MLE via
-the Kalman Filter).
-
-Error Correction Models (ECM)
-"""""""""""""""""""""""""""""
-Error correction models are reparameterizations of ARDL models that
-regress the difference of the endogenous variable on the lagged levels
-of the endogenous variables and optional lagged differences of the
-exogenous variables.
-
-.. currentmodule:: statsmodels.tsa
-
-.. autosummary::
-   :toctree: generated/
-
-   ardl.UECM
-   ardl.UECMResults
-   ardl.BoundsTestResult
-
-
-Statespace Models
-"""""""""""""""""
-See the :ref:`statespace documentation <statespace>`.
-
-
-Vector ARs and Vector Error Correction Models
-"""""""""""""""""""""""""""""""""""""""""""""
-See the :ref:`vector_ar documentation. <var>`
-
-Regime switching models
-"""""""""""""""""""""""
-
-.. currentmodule:: statsmodels.tsa.regime_switching.markov_regression
-.. autosummary::
-   :toctree: generated/
-
-   MarkovRegression
-
-.. currentmodule:: statsmodels.tsa.regime_switching.markov_autoregression
-.. autosummary::
-   :toctree: generated/
-
-   MarkovAutoregression
-
 
 Time Series Filters
 """""""""""""""""""
 
-.. currentmodule:: statsmodels.tsa.filters.bk_filter
 .. autosummary::
    :toctree: generated/
 
-   bkfilter
+   filters.bk_filter.bkfilter
+   filters.hp_filter.hpfilter
+   filters.cf_filter.cffilter
+   filters.filtertools.convolution_filter
+   filters.filtertools.recursive_filter
+   filters.filtertools.miso_lfilter
+   filters.filtertools.fftconvolve3
+   filters.filtertools.fftconvolveinv
+   seasonal.seasonal_decompose
 
-.. currentmodule:: statsmodels.tsa.filters.hp_filter
-.. autosummary::
-   :toctree: generated/
-
-   hpfilter
-
-.. currentmodule:: statsmodels.tsa.filters.cf_filter
-.. autosummary::
-   :toctree: generated/
-
-   cffilter
-
-.. currentmodule:: statsmodels.tsa.filters.filtertools
-.. autosummary::
-   :toctree: generated/
-
-   convolution_filter
-   recursive_filter
-   miso_lfilter
-   fftconvolve3
-   fftconvolveinv
-
-
-.. currentmodule:: statsmodels.tsa.seasonal
-.. autosummary::
-   :toctree: generated/
-
-   seasonal_decompose
-   STL
-   MSTL
-   DecomposeResult
 
 TSA Tools
 """""""""
 
-.. currentmodule:: statsmodels.tsa.tsatools
+.. currentmodule:: statsmodels.tsa
 
 .. autosummary::
    :toctree: generated/
 
-   add_lag
-   add_trend
-   detrend
-   lagmat
-   lagmat2ds
+   tsatools.add_trend
+   tsatools.detrend
+   tsatools.lagmat
+   tsatools.lagmat2ds
 
 VARMA Process
 """""""""""""
 
-.. currentmodule:: statsmodels.tsa.varma_process
 .. autosummary::
    :toctree: generated/
 
-   VarmaPoly
+   varma_process.VarmaPoly
 
 Interpolation
 """""""""""""
 
-.. currentmodule:: statsmodels.tsa.interp.denton
 .. autosummary::
    :toctree: generated/
 
-   dentonm
-
-
-Deterministic Processes
-"""""""""""""""""""""""
-
-Deterministic processes simplify creating deterministic sequences with time
-trend or seasonal patterns. They also provide methods to simplify generating
-deterministic terms for out-of-sample forecasting. A
-:class:`~statsmodels.tsa.deterministic.DeterministicProcess` can be directly
-used with :class:`~statsmodels.tsa.ar_model.AutoReg` to construct complex
-deterministic dynamics and to forecast without constructing exogenous trends.
-
-.. currentmodule:: statsmodels.tsa.deterministic
-.. autosummary::
-   :toctree: generated/
-
-   DeterministicProcess
-   TimeTrend
-   Seasonality
-   Fourier
-   CalendarTimeTrend
-   CalendarSeasonality
-   CalendarFourier
-   DeterministicTerm
-   CalendarDeterministicTerm
-   FourierDeterministicTerm
-   TimeTrendDeterministicTerm
-
-Users who wish to write custom deterministic terms must subclass
-:class:`~statsmodels.tsa.deterministic.DeterministicTerm`.
-
-.. currentmodule:: statsmodels.tsa.deterministic
-.. autosummary::
-   :toctree: generated/
-
-   DeterministicTerm
-
-Forecasting Models
-""""""""""""""""""
-.. module:: statsmodels.tsa.forecasting
-   :synopsis: Models designed for forecasting
-
-.. currentmodule:: statsmodels.tsa.forecasting
-
-The Theta Model
-~~~~~~~~~~~~~~~
-The Theta model is a simple forecasting method that combines a linear time
-trend with a Simple Exponential Smoother (Assimakopoulos & Nikolopoulos).
-An estimator for the parameters of the Theta model and methods to forecast
-are available in:
-
-.. module:: statsmodels.tsa.forecasting.theta
-   :synopsis: Models designed for forecasting
-
-.. currentmodule:: statsmodels.tsa.forecasting.theta
-
-.. autosummary::
-   :toctree: generated/
-
-   ThetaModel
-   ThetaModelResults
-
-Forecasting after STL Decomposition
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-:class:`statsmodels.tsa.seasonal.STL` is commonly used to remove seasonal
-components from a time series. The deseasonalized time series can then
-be modeled using a any non-seasonal model, and forecasts are constructed
-by adding the forecast from the non-seasonal model to the estimates of
-the seasonal component from the final full-cycle which are forecast using
-a random-walk model.
-
-.. module:: statsmodels.tsa.forecasting.stl
-   :synopsis: Models designed for forecasting
-
-.. currentmodule:: statsmodels.tsa.forecasting.stl
-
-.. autosummary::
-   :toctree: generated/
-
-   STLForecast
-   STLForecastResults
-
-Prediction Results
-""""""""""""""""""
-Most forecasting methods support a ``get_prediction`` method that return
-a ``PredictionResults`` object that contains both the prediction, its
-variance and can construct a prediction interval.
-
-Results Class
-~~~~~~~~~~~~~
-
-.. module:: statsmodels.tsa.base.prediction
-   :synopsis: Shared objects for predictive methods
-
-.. currentmodule:: statsmodels.tsa.base.prediction
-
-.. autosummary::
-   :toctree: generated/
-
-   PredictionResults
-
+   interp.denton.dentonm

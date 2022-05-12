@@ -1,6 +1,7 @@
 """
 Compatibility tools for various data structure inputs
 """
+from statsmodels.compat.python import range
 import numpy as np
 import pandas as pd
 
@@ -38,7 +39,7 @@ def interpret_data(data, colnames=None, rownames=None):
 
     Parameters
     ----------
-    data : array_like
+    data : ndarray-like
     colnames : sequence or None
         May be part of data structure
     rownames : sequence or None
@@ -48,7 +49,12 @@ def interpret_data(data, colnames=None, rownames=None):
     (values, colnames, rownames) : (homogeneous ndarray, list)
     """
     if isinstance(data, np.ndarray):
-        values = np.asarray(data)
+        if _is_structured_ndarray(data):
+            if colnames is None:
+                colnames = data.dtype.names
+            values = struct_to_ndarray(data)
+        else:
+            values = data
 
         if colnames is None:
             colnames = ['Y_%d' % i for i in range(values.shape[1])]
@@ -59,8 +65,7 @@ def interpret_data(data, colnames=None, rownames=None):
         colnames = data.columns
         rownames = data.index
     else:  # pragma: no cover
-        raise TypeError('Cannot handle input type {typ}'
-                        .format(typ=type(data).__name__))
+        raise Exception('cannot handle other input types at the moment')
 
     if not isinstance(colnames, list):
         colnames = list(colnames)
@@ -78,7 +83,7 @@ def interpret_data(data, colnames=None, rownames=None):
 
 
 def struct_to_ndarray(arr):
-    return arr.view((float, (len(arr.dtype.names),)), type=np.ndarray)
+    return arr.view((float, len(arr.dtype.names)), type=np.ndarray)
 
 
 def _is_using_ndarray_type(endog, exog):
@@ -92,7 +97,8 @@ def _is_using_ndarray(endog, exog):
 
 
 def _is_using_pandas(endog, exog):
-    from statsmodels.compat.pandas import data_klasses as klasses
+    # TODO: Remove WidePanel when finished with it
+    klasses = (pd.Series, pd.DataFrame, pd.WidePanel, pd.Panel)
     return (isinstance(endog, klasses) or isinstance(exog, klasses))
 
 

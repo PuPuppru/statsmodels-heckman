@@ -11,6 +11,8 @@ kernel density estimation much easier.
 NOTE: As it is, this module does not interact with the existing API
 """
 
+from __future__ import division
+
 import numpy as np
 from scipy.special import erf
 
@@ -30,9 +32,9 @@ def aitchison_aitken(h, Xi, x, num_levels=None):
         The bandwidths used to estimate the value of the kernel function.
     Xi : 2-D ndarray of ints, shape (nobs, K)
         The value of the training set.
-    x : 1-D ndarray, shape (K,)
+    x: 1-D ndarray, shape (K,)
         The value at which the kernel density is being estimated.
-    num_levels : bool, optional
+    num_levels: bool, optional
         Gives the user the option to specify the number of levels for the
         random variable.  If False, the number of levels is calculated from
         the data.
@@ -50,9 +52,9 @@ def aitchison_aitken(h, Xi, x, num_levels=None):
 
     References
     ----------
-    .. [*] J. Aitchison and C.G.G. Aitken, "Multivariate binary discrimination
+    .. [1] J. Aitchison and C.G.G. Aitken, "Multivariate binary discrimination
            by the kernel method", Biometrika, vol. 63, pp. 413-420, 1976.
-    .. [*] Racine, Jeff. "Nonparametric Econometrics: A Primer," Foundation
+    .. [2] Racine, Jeff. "Nonparametric Econometrics: A Primer," Foundation
            and Trends in Econometrics: Vol 3: No 1, pp1-88., 2008.
     """
     Xi = Xi.reshape(Xi.size)  # seems needed in case Xi is scalar
@@ -92,10 +94,10 @@ def wang_ryzin(h, Xi, x):
 
     References
     ----------
-    .. [*] Racine, Jeff. "Nonparametric Econometrics: A Primer," Foundation
+    .. [1] Racine, Jeff. "Nonparametric Econometrics: A Primer," Foundation
            and Trends in Econometrics: Vol 3: No 1, pp1-88., 2008.
            http://dx.doi.org/10.1561/0800000009
-    .. [*] M.-C. Wang and J. van Ryzin, "A class of smooth estimators for
+    .. [2] M.-C. Wang and J. van Ryzin, "A class of smooth estimators for
            discrete distributions", Biometrika, vol. 68, pp. 301-309, 1981.
     """
     Xi = Xi.reshape(Xi.size)  # seems needed in case Xi is scalar
@@ -121,30 +123,9 @@ def gaussian(h, Xi, x):
     -------
     kernel_value : ndarray, shape (nobs, K)
         The value of the kernel function at each training point for each var.
+
     """
     return (1. / np.sqrt(2 * np.pi)) * np.exp(-(Xi - x)**2 / (h**2 * 2.))
-
-
-def tricube(h, Xi, x):
-    """
-    Tricube Kernel for continuous variables
-    Parameters
-    ----------
-    h : 1-D ndarray, shape (K,)
-        The bandwidths used to estimate the value of the kernel function.
-    Xi : 1-D ndarray, shape (K,)
-        The value of the training set.
-    x : 1-D ndarray, shape (K,)
-        The value at which the kernel density is being estimated.
-
-    Returns
-    -------
-    kernel_value : ndarray, shape (nobs, K)
-        The value of the kernel function at each training point for each var.
-    """
-    u = (Xi - x) / h
-    u[np.abs(u) > 1] = 0
-    return (70. / 81) * (1 - np.abs(u)**3)**3
 
 
 def gaussian_convolution(h, Xi, x):

@@ -44,7 +44,7 @@ doc = {'description':
 ''',
 'ref': ''}
 
-class _UnivariateFunction:
+class _UnivariateFunction(object):
     #Base Class for Univariate non-linear example.
     #Does not work on it's own. needs additionally at least self.func
     __doc__ = '''%(description)s
@@ -106,7 +106,7 @@ class _UnivariateFunction:
 
         Parameters
         ----------
-        scatter : bool
+        scatter: bool
             If true, then add scatterpoints of sample to plot.
         ax : None or matplotlib axis instance
             If None, then a matplotlib.pyplot figure is created, otherwise
@@ -114,7 +114,7 @@ class _UnivariateFunction:
 
         Returns
         -------
-        Figure
+        fig : matplotlib figure
             This is either the created figure instance or the one associated
             with ax if ax is given.
 

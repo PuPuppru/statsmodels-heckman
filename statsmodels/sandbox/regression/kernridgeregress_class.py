@@ -3,20 +3,22 @@
 
 import numpy as np
 from scipy import spatial as ssp
+from numpy.testing import assert_equal
 import matplotlib.pylab as plt
 
+def plt_closeall(n=10):
+    '''close a number of open matplotlib windows'''
+    for i in range(n): plt.close()
 
 def kernel_rbf(x,y,scale=1, **kwds):
     #scale = kwds.get('scale',1)
     dist = ssp.minkowski_distance_p(x[:,np.newaxis,:],y[np.newaxis,:,:],2)
     return np.exp(-0.5/scale*(dist))
 
-
 def kernel_euclid(x,y,p=2, **kwds):
     return ssp.minkowski_distance(x[:,np.newaxis,:],y[np.newaxis,:,:],p)
 
-
-class GaussProcess:
+class GaussProcess(object):
     '''class to perform kernel ridge regression (gaussian process)
 
     Warning: this class is memory intensive, it creates nobs x nobs distance
@@ -33,7 +35,7 @@ class GaussProcess:
     * automatic selection or proposal of smoothing parameters
 
     Note: this is different from kernel smoothing regression,
-       see for example https://en.wikipedia.org/wiki/Kernel_smoother
+       see for example http://en.wikipedia.org/wiki/Kernel_smoother
 
     In this version of the kernel ridge regression, the training points
     are fitted exactly.
@@ -95,7 +97,7 @@ class GaussProcess:
         self.distxsample = kernel(x,x,scale=scale)
         self.Kinv = np.linalg.inv(self.distxsample +
                              np.eye(*self.distxsample.shape)*ridgecoeff)
-        if y is not None:
+        if not y is None:
             self.y = y
             self.yest = self.fit(y)
 
@@ -120,7 +122,7 @@ class GaussProcess:
     def plot(self, y, plt=plt ):
         '''some basic plots'''
         #todo return proper graph handles
-        plt.figure()
+        plt.figure();
         plt.plot(self.x,self.y, 'bo-', self.x, self.yest, 'r.-')
         plt.title('sample (training) points')
         plt.figure()
@@ -204,3 +206,4 @@ if __name__ == '__main__':
     #example2(m=200, scale=0.01,stride=4)
     example1()
     #plt.show()
+    #plt_closeall()   # use this to close the open figure windows

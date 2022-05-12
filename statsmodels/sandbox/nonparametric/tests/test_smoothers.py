@@ -9,11 +9,11 @@ License: BSD-3
 import numpy as np
 from numpy.testing import assert_almost_equal, assert_equal
 
-from statsmodels.sandbox.nonparametric import smoothers
+from statsmodels.sandbox.nonparametric import smoothers, kernels
 from statsmodels.regression.linear_model import OLS, WLS
 
 
-class CheckSmoother:
+class CheckSmoother(object):
 
     def test_predict(self):
         assert_almost_equal(self.res_ps.predict(self.x),
@@ -34,60 +34,56 @@ class CheckSmoother:
 
 
 
-class BasePolySmoother:
+class BasePolySmoother(object):
 
-    @classmethod
-    def setup_class(cls):
+    def __init__(self):
         #DGP: simple polynomial
         order = 3
         sigma_noise = 0.5
         nobs = 100
         lb, ub = -1, 2
-        cls.x = x = np.linspace(lb, ub, nobs)
-        cls.exog = exog = x[:,None]**np.arange(order+1)
+        self.x = x = np.linspace(lb, ub, nobs)
+        self.exog = exog = x[:,None]**np.arange(order+1)
         y_true = exog.sum(1)
         np.random.seed(987567)
-        cls.y = y = y_true + sigma_noise * np.random.randn(nobs)
+        self.y = y = y_true + sigma_noise * np.random.randn(nobs)
 
 
 class TestPolySmoother1(BasePolySmoother, CheckSmoother):
 
-    @classmethod
-    def setup_class(cls):
-        super(TestPolySmoother1, cls).setup_class() #initialize DGP
+    def __init__(self):
+        super(self.__class__, self).__init__() #initialize DGP
 
-        y, x, exog = cls.y, cls.x, cls.exog
+        y, x, exog = self.y, self.x, self.exog
 
         #use order = 2 in regression
         pmod = smoothers.PolySmoother(2, x)
         pmod.fit(y)  #no return
 
-        cls.res_ps = pmod
-        cls.res2 = OLS(y, exog[:,:2+1]).fit()
+        self.res_ps = pmod
+        self.res2 = OLS(y, exog[:,:2+1]).fit()
 
 class TestPolySmoother2(BasePolySmoother, CheckSmoother):
 
-    @classmethod
-    def setup_class(cls):
-        super(TestPolySmoother2, cls).setup_class() #initialize DGP
+    def __init__(self):
+        super(self.__class__, self).__init__() #initialize DGP
 
-        y, x, exog = cls.y, cls.x, cls.exog
+        y, x, exog = self.y, self.x, self.exog
 
         #use order = 3 in regression
         pmod = smoothers.PolySmoother(3, x)
         #pmod.fit(y)  #no return
         pmod.smooth(y)  #no return, use alias for fit
 
-        cls.res_ps = pmod
-        cls.res2 = OLS(y, exog[:,:3+1]).fit()
+        self.res_ps = pmod
+        self.res2 = OLS(y, exog[:,:3+1]).fit()
 
 class TestPolySmoother3(BasePolySmoother, CheckSmoother):
 
-    @classmethod
-    def setup_class(cls):
-        super(TestPolySmoother3, cls).setup_class() #initialize DGP
+    def __init__(self):
+        super(self.__class__, self).__init__() #initialize DGP
 
-        y, x, exog = cls.y, cls.x, cls.exog
+        y, x, exog = self.y, self.x, self.exog
         nobs = y.shape[0]
         weights = np.ones(nobs)
         weights[:nobs//3] = 0.1
@@ -97,8 +93,8 @@ class TestPolySmoother3(BasePolySmoother, CheckSmoother):
         pmod = smoothers.PolySmoother(2, x)
         pmod.fit(y, weights=weights)  #no return
 
-        cls.res_ps = pmod
-        cls.res2 = WLS(y, exog[:,:2+1], weights=weights).fit()
+        self.res_ps = pmod
+        self.res2 = WLS(y, exog[:,:2+1], weights=weights).fit()
 
 
 if __name__ == '__main__':
@@ -109,3 +105,4 @@ if __name__ == '__main__':
 
     t3 = TestPolySmoother3()
     t3.test_predict()
+

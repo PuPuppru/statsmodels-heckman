@@ -9,25 +9,24 @@ Assumes no missing values.
 colors of lines in graphs are not great
 
 uses DataFrame and WidePanel to hold data downloaded from yahoo using matplotlib.
-I have not figured out storage, so the download happens at each run
+I haven't figured out storage, so the download happens at each run
 of the script.
+
+getquotes is from pandas\examples\finance.py
 
 Created on Sat Jan 30 16:30:18 2010
 Author: josef-pktd
 """
-import os
-
 from statsmodels.compat.python import lzip
 import numpy as np
 import matplotlib.finance as fin
 import matplotlib.pyplot as plt
 import datetime as dt
 
-import pandas as pd
+import pandas as pa
 
 
 def getquotes(symbol, start, end):
-    # Taken from the no-longer-existent pandas.examples.finance
     quotes = fin.quotes_historical_yahoo(symbol, start, end)
     dates, open, close, high, low, volume = lzip(*quotes)
 
@@ -39,8 +38,8 @@ def getquotes(symbol, start, end):
         'volume' : volume
     }
 
-    dates = pd.Index([dt.datetime.fromordinal(int(d)) for d in dates])
-    return pd.DataFrame(data, index=dates)
+    dates = pa.Index([dt.datetime.fromordinal(int(d)) for d in dates])
+    return pa.DataFrame(data, index=dates)
 
 
 start_date = dt.datetime(2007, 1, 1)
@@ -57,10 +56,10 @@ indexsym = ['gspc', 'dji']
 # download data
 dmall = {}
 for sy in dj30:
-    dmall[sy]  = getquotes(sy, start_date, end_date)
+   dmall[sy]  = getquotes(sy, start_date, end_date)
 
 # combine into WidePanel
-pawp = pd.WidePanel.fromDict(dmall)
+pawp = pa.WidePanel.fromDict(dmall)
 print(pawp.values.shape)
 
 # select closing prices
@@ -69,6 +68,7 @@ paclose = pawp.getMinorXS('close')
 # take log and first difference over time
 paclose_ratereturn = paclose.apply(np.log).diff()
 
+import os
 if not os.path.exists('dj30rr'):
     #if pandas is updated, then sometimes unpickling fails, and need to save again
     paclose_ratereturn.save('dj30rr')

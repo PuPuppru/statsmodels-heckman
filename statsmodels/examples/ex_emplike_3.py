@@ -6,9 +6,9 @@ We will be using the Stanford Heart Transplant data
 
 """
 
-import numpy as np
-
+from __future__ import print_function
 import statsmodels.api as sm
+import numpy as np
 
 data = sm.datasets.heart.load()
 # Note this data has endog, exog and censors

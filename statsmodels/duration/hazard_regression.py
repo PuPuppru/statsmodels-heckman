@@ -1,3 +1,11 @@
+import numpy as np
+from statsmodels.base import model
+import statsmodels.base.model as base
+from statsmodels.tools.decorators import cache_readonly
+from scipy.optimize import brent
+from statsmodels.compat.numpy import np_matrix_rank
+from statsmodels.compat.numpy import np_new_unique
+
 """
 Implementation of proportional hazards regression models for duration
 data that may be censored ("Cox models").
@@ -14,12 +22,6 @@ B Gillespie (2006).  Checking the assumptions in the Cox proportional
 hazards model.
 http://www.mwsug.org/proceedings/2006/stats/MWSUG-2006-SD08.pdf
 """
-import numpy as np
-
-from statsmodels.base import model
-import statsmodels.base.model as base
-from statsmodels.tools.decorators import cache_readonly
-from statsmodels.compat.pandas import Appender
 
 
 _predict_docstring = """
@@ -27,34 +29,32 @@ _predict_docstring = """
     regression model.
 
     Parameters
-    ----------%(params_doc)s
-    exog : array_like
+    ----------
+    params : array-like
+        The proportional hazards model parameters.
+    exog : array-like
         Data to use as `exog` in forming predictions.  If not
         provided, the `exog` values from the model used to fit the
         data are used.%(cov_params_doc)s
-    endog : array_like
+    endog : array-like
         Duration (time) values at which the predictions are made.
         Only used if pred_type is either 'cumhaz' or 'surv'.  If
         using model `exog`, defaults to model `endog` (time), but
         may be provided explicitly to make predictions at
         alternative times.
-    strata : array_like
+    strata : array-like
         A vector of stratum values used to form the predictions.
         Not used (may be 'None') if pred_type is 'lhr' or 'hr'.
         If `exog` is None, the model stratum values are used.  If
         `exog` is not None and pred_type is 'surv' or 'cumhaz',
         stratum values must be provided (unless there is only one
         stratum).
-    offset : array_like
+    offset : array-like
         Offset values used to create the predicted values.
-    pred_type : str
+    pred_type : string
         If 'lhr', returns log hazard ratios, if 'hr' returns
         hazard ratios, if 'surv' returns the survival function, if
         'cumhaz' returns the cumulative hazard function.
-    pred_only : bool
-        If True, returns only an array of predicted values.  Otherwise
-        returns a bunch containing the predicted values and standard
-        errors.
 
     Returns
     -------
@@ -70,19 +70,15 @@ _predict_docstring = """
     hazard function.
 """
 
-_predict_params_doc = """
-    params : array_like
-        The proportional hazards model parameters."""
-
 _predict_cov_params_docstring = """
-    cov_params : array_like
+    cov_params : array-like
         The covariance matrix of the estimated `params` vector,
         used to obtain prediction errors if pred_type='lhr',
         otherwise optional."""
 
 
 
-class PHSurvivalTime:
+class PHSurvivalTime(object):
 
     def __init__(self, time, status, exog, strata=None, entry=None,
                  offset=None):
@@ -111,7 +107,7 @@ class PHSurvivalTime:
             None, the entry time is treated as being zero, which
             gives no left truncation.  The entry time must be less
             than or equal to `time`.
-        offset : array_like
+        offset : array-like
             An optional array of offsets
         """
 
@@ -124,11 +120,26 @@ class PHSurvivalTime:
             entry = np.zeros(len(time))
 
         # Parameter validity checks.
-        self._check(time, status, strata, entry)
+        n1, n2, n3, n4 = len(time), len(status), len(strata),\
+            len(entry)
+        nv = [n1, n2, n3, n4]
+        if max(nv) != min(nv):
+            raise ValueError("endog, status, strata, and " +
+                             "entry must all have the same length")
+        if min(time) < 0:
+            raise ValueError("endog must be non-negative")
+        if min(entry) < 0:
+            raise ValueError("entry time must be non-negative")
+
+        # In Stata, this is entry >= time, in R it is >.
+        if np.any(entry > time):
+            raise ValueError("entry times may not occur " +
+                             "after event or censoring times")
 
         # Get the row indices for the cases in each stratum
         stu = np.unique(strata)
-        sth = {x: [] for x in stu}
+        #sth = {x: [] for x in stu} # needs >=2.7
+        sth = dict([(x, []) for x in stu])
         for i,k in enumerate(strata):
             sth[k].append(i)
         stratum_rows = [np.asarray(sth[k], dtype=np.int32) for k in stu]
@@ -178,14 +189,19 @@ class PHSurvivalTime:
         # Number of informative subjects
         self.n_obs = sum([len(ix) for ix in stratum_rows])
 
+        # Split everything by stratum
+        self.time_s = []
+        self.exog_s = []
+        self.status_s = []
+        self.entry_s = []
+        for ix in stratum_rows:
+            self.time_s.append(time[ix])
+            self.exog_s.append(exog[ix,:])
+            self.status_s.append(status[ix])
+            self.entry_s.append(entry[ix])
+
         self.stratum_rows = stratum_rows
         self.stratum_names = stratum_names
-
-        # Split everything by stratum
-        self.time_s = self._split(time)
-        self.exog_s = self._split(exog)
-        self.status_s = self._split(status)
-        self.entry_s = self._split(entry)
 
         # Precalculate some indices needed to fit Cox models.
         # Distinct failure times within a stratum are always taken to
@@ -237,69 +253,39 @@ class PHSurvivalTime:
                 risk_exit1[ix].append(i)
 
             self.ufailt.append(uft)
-            self.ufailt_ix.append([np.asarray(x, dtype=np.int32)
-                                   for x in uft_ix])
-            self.risk_enter.append([np.asarray(x, dtype=np.int32)
-                                    for x in risk_enter1])
-            self.risk_exit.append([np.asarray(x, dtype=np.int32)
-                                   for x in risk_exit1])
+            self.ufailt_ix.append([np.asarray(x, dtype=np.int32) for x in uft_ix])
+            self.risk_enter.append([np.asarray(x, dtype=np.int32) for x in risk_enter1])
+            self.risk_exit.append([np.asarray(x, dtype=np.int32) for x in risk_exit1])
 
-    def _split(self, x):
-        v = []
-        if x.ndim == 1:
-            for ix in self.stratum_rows:
-                v.append(x[ix])
-        else:
-            for ix in self.stratum_rows:
-                v.append(x[ix, :])
-        return v
-
-    def _check(self, time, status, strata, entry):
-        n1, n2, n3, n4 = len(time), len(status), len(strata),\
-            len(entry)
-        nv = [n1, n2, n3, n4]
-        if max(nv) != min(nv):
-            raise ValueError("endog, status, strata, and " +
-                             "entry must all have the same length")
-        if min(time) < 0:
-            raise ValueError("endog must be non-negative")
-        if min(entry) < 0:
-            raise ValueError("entry time must be non-negative")
-
-        # In Stata, this is entry >= time, in R it is >.
-        if np.any(entry > time):
-            raise ValueError("entry times may not occur " +
-                             "after event or censoring times")
 
 
 class PHReg(model.LikelihoodModel):
     """
-    Cox Proportional Hazards Regression Model
-
-    The Cox PH Model is for right censored data.
+    Fit the Cox proportional hazards regression model for right
+    censored data.
 
     Parameters
     ----------
-    endog : array_like
+    endog : array-like
         The observed times (event or censoring)
-    exog : 2D array_like
+    exog : 2D array-like
         The covariates or exogeneous variables
-    status : array_like
+    status : array-like
         The censoring status values; status=1 indicates that an
-        event occurred (e.g. failure or death), status=0 indicates
+        event occured (e.g. failure or death), status=0 indicates
         that the observation was right censored. If None, defaults
         to status=1 for all cases.
-    entry : array_like
+    entry : array-like
         The entry times, if left truncation occurs
-    strata : array_like
+    strata : array-like
         Stratum labels.  If None, all observations are taken to be
         in a single stratum.
-    ties : str
+    ties : string
         The method used to handle tied times, must be either 'breslow'
         or 'efron'.
-    offset : array_like
+    offset : array-like
         Array of offset values
-    missing : str
+    missing : string
         The method used to handle missing data
 
     Notes
@@ -345,9 +331,9 @@ class PHReg(model.LikelihoodModel):
         # TODO: not used?
         self.missing = missing
 
-        self.df_resid = float(self.exog.shape[0] -
-                              np.linalg.matrix_rank(self.exog))
-        self.df_model = float(np.linalg.matrix_rank(self.exog))
+        self.df_resid = (np.float(self.exog.shape[0] -
+                                  np_matrix_rank(self.exog)))
+        self.df_model = np.float(np_matrix_rank(self.exog))
 
         ties = ties.lower()
         if ties not in ("efron", "breslow"):
@@ -368,28 +354,28 @@ class PHReg(model.LikelihoodModel):
         ----------
         formula : str or generic Formula object
             The formula specifying the model
-        data : array_like
+        data : array-like
             The data for the model. See Notes.
-        status : array_like
+        status : array-like
             The censoring status values; status=1 indicates that an
-            event occurred (e.g. failure or death), status=0 indicates
+            event occured (e.g. failure or death), status=0 indicates
             that the observation was right censored. If None, defaults
             to status=1 for all cases.
-        entry : array_like
+        entry : array-like
             The entry times, if left truncation occurs
-        strata : array_like
+        strata : array-like
             Stratum labels.  If None, all observations are taken to be
             in a single stratum.
-        offset : array_like
+        offset : array-like
             Array of offset values
-        subset : array_like
+        subset : array-like
             An array-like object of booleans, integers, or index
             values that indicate the subset of df to use in the
             model. Assumes df is a `pandas.DataFrame`
-        ties : str
+        ties : string
             The method used to handle tied times, must be either 'breslow'
             or 'efron'.
-        missing : str
+        missing : string
             The method used to handle missing data
         args : extra arguments
             These are passed to the model
@@ -417,7 +403,7 @@ class PHReg(model.LikelihoodModel):
             offset = data[offset]
 
         import re
-        terms = re.split(r"[+\-~]", formula)
+        terms = re.split("[+\-~]", formula)
         for term in terms:
             term = term.strip()
             if term in ("0", "1"):
@@ -438,15 +424,12 @@ class PHReg(model.LikelihoodModel):
 
         Parameters
         ----------
-        groups : array_like
+        groups : array-like
             Labels indicating groups of observations that may be
             dependent.  If present, the standard errors account for
             this dependence. Does not affect fitted values.
 
-        Returns
-        -------
-        PHRegResults
-            Returns a results instance.
+        Returns a PHregResults instance.
         """
 
         # TODO process for missing values
@@ -461,7 +444,6 @@ class PHReg(model.LikelihoodModel):
 
         if 'disp' not in args:
             args['disp'] = False
-
         fit_rslts = super(PHReg, self).fit(**args)
 
         if self.groups is None:
@@ -473,41 +455,40 @@ class PHReg(model.LikelihoodModel):
 
         return results
 
+
     def fit_regularized(self, method="elastic_net", alpha=0.,
                         start_params=None, refit=False, **kwargs):
-        r"""
+        """
         Return a regularized fit to a linear regression model.
 
         Parameters
         ----------
-        method : {'elastic_net'}
+        method :
             Only the `elastic_net` approach is currently implemented.
-        alpha : scalar or array_like
+        alpha : scalar or array-like
             The penalty weight.  If a scalar, the same penalty weight
             applies to all variables in the model.  If a vector, it
             must have the same length as `params`, and contains a
             penalty weight for each coefficient.
-        start_params : array_like
+        start_params : array-like
             Starting values for `params`.
         refit : bool
             If True, the model is refit using only the variables that
             have non-zero coefficients in the regularized fit.  The
             refitted model is not regularized.
-        **kwargs
-            Additional keyword arguments used to fit the model.
+
 
         Returns
         -------
-        PHRegResults
-            Returns a results instance.
+        A results object.
 
         Notes
         -----
         The penalty is the ``elastic net`` penalty, which is a
         combination of L1 and L2 penalties.
 
-        The function that is minimized is:
-
+        The function that is minimized is: 
+        
         .. math::
 
             -loglike/n + alpha*((1-L1\_wt)*|params|_2^2/2 + L1\_wt*|params|_1)
@@ -997,7 +978,7 @@ class PHReg(model.LikelihoodModel):
             linpred -= linpred.max()
             e_linpred = np.exp(linpred)
 
-            at_risk_ix = set()
+            at_risk_ix = set([])
 
             # Iterate backward through the unique failure times.
             for i in range(nuft)[::-1]:
@@ -1194,14 +1175,9 @@ class PHReg(model.LikelihoodModel):
 
         return cumhaz_f
 
-    @Appender(_predict_docstring % {
-        'params_doc': _predict_params_doc,
-        'cov_params_doc': _predict_cov_params_docstring})
     def predict(self, params, exog=None, cov_params=None, endog=None,
-                strata=None, offset=None, pred_type="lhr", pred_only=False):
-
-        # This function breaks mediation, because it does not simply
-        # return the predicted values as an array.
+                strata=None, offset=None, pred_type="lhr"):
+        # docstring attached below
 
         pred_type = pred_type.lower()
         if pred_type not in ["lhr", "hr", "surv", "cumhaz"]:
@@ -1213,7 +1189,7 @@ class PHReg(model.LikelihoodModel):
             standard_errors = None
         ret_val = bunch()
 
-        # Do not do anything with offset here because we want to allow
+        # Don't do anything with offset here because we want to allow
         # different offsets to be specified even if exog is the model
         # exog.
         exog_provided = True
@@ -1228,7 +1204,7 @@ class PHReg(model.LikelihoodModel):
         elif self.offset is not None and not exog_provided:
             lhr += self.offset
 
-        # Handle lhr and hr prediction first, since they do not make
+        # Handle lhr and hr prediction first, since they don't make
         # use of the hazard function.
 
         if pred_type == "lhr":
@@ -1237,16 +1213,12 @@ class PHReg(model.LikelihoodModel):
                 mat = np.dot(exog, cov_params)
                 va = (mat * exog).sum(1)
                 ret_val.standard_errors = np.sqrt(va)
-            if pred_only:
-                return ret_val.predicted_values
             return ret_val
 
         hr = np.exp(lhr)
 
         if pred_type == "hr":
             ret_val.predicted_values = hr
-            if pred_only:
-                return ret_val.predicted_values
             return ret_val
 
         # Makes sure endog is defined
@@ -1280,12 +1252,11 @@ class PHReg(model.LikelihoodModel):
         elif pred_type == "surv":
             ret_val.predicted_values = np.exp(-cumhaz)
 
-        if pred_only:
-            return ret_val.predicted_values
-
         return ret_val
 
-    def get_distribution(self, params, scale=1.0, exog=None):
+    predict.__doc__ = _predict_docstring % {'cov_params_doc': _predict_cov_params_docstring}
+
+    def get_distribution(self, params):
         """
         Returns a scipy distribution object corresponding to the
         distribution of uncensored endog (duration) values for each
@@ -1293,12 +1264,8 @@ class PHReg(model.LikelihoodModel):
 
         Parameters
         ----------
-        params : array_like
+        params : array-like
             The proportional hazards model parameters.
-        scale : float
-            Present for compatibility, not used.
-        exog : array_like
-            A design matrix, defaults to model.exog.
 
         Returns
         -------
@@ -1311,6 +1278,12 @@ class PHReg(model.LikelihoodModel):
         failure times within a stratum.
         """
 
+        # TODO: this returns a Python list of rv_discrete objects, so
+        # nothing can be vectorized.  It appears that rv_discrete does
+        # not allow vectorization.
+
+        from scipy.stats.distributions import rv_discrete
+
         surv = self.surv
         bhaz = self.baseline_cumulative_hazard(params)
 
@@ -1318,14 +1291,9 @@ class PHReg(model.LikelihoodModel):
         # stratum
         pk, xk = [], []
 
-        if exog is None:
-            exog_split = surv.exog_s
-        else:
-            exog_split = self.surv._split(exog)
-
         for stx in range(self.surv.nstrat):
 
-            exog_s = exog_split[stx]
+            exog_s = surv.exog_s[stx]
 
             linpred = np.dot(exog_s, params)
             if surv.offset_s is not None:
@@ -1385,17 +1353,19 @@ class PHRegResults(base.LikelihoodModelResults):
     ----------
     See statsmodels.LikelihoodModelResults
 
-    Attributes
-    ----------
+    Returns
+    -------
+    **Attributes**
+
     model : class instance
         PHreg model instance that called fit.
-    normalized_cov_params : ndarray
+    normalized_cov_params : array
         The sampling covariance matrix of the estimates
-    params : ndarray
+    params : array
         The coefficients of the fitted model.  Each coefficient is the
         log hazard ratio corresponding to a 1 unit difference in a
         single covariate while holding the other covariates fixed.
-    bse : ndarray
+    bse : array
         The standard errors of the fitted parameters.
 
     See Also
@@ -1443,14 +1413,16 @@ class PHRegResults(base.LikelihoodModelResults):
         -----
         The distributions are obtained from a simple discrete estimate
         of the survivor function that puts all mass on the observed
-        failure times within a stratum.
+        failure times wihtin a stratum.
         """
 
         return self.model.get_distribution(self.params)
 
-    @Appender(_predict_docstring % {'params_doc': '', 'cov_params_doc': ''})
+
     def predict(self, endog=None, exog=None, strata=None,
                 offset=None, transform=True, pred_type="lhr"):
+        # docstring attached below
+
         return super(PHRegResults, self).predict(exog=exog,
                                                  transform=transform,
                                                  cov_params=self.cov_params(),
@@ -1459,11 +1431,13 @@ class PHRegResults(base.LikelihoodModelResults):
                                                  offset=offset,
                                                  pred_type=pred_type)
 
+    predict.__doc__ = _predict_docstring % {'cov_params_doc': ''}
+
     def _group_stats(self, groups):
         """
         Descriptive statistics of the groups.
         """
-        gsizes = np.unique(groups, return_counts=True)
+        gsizes = np_new_unique(groups, return_counts=True)
         gsizes = gsizes[1]
         return gsizes.min(), gsizes.max(), gsizes.mean(), len(gsizes)
 
@@ -1575,14 +1549,12 @@ class PHRegResults(base.LikelihoodModelResults):
         Summarize the proportional hazards regression results.
 
         Parameters
-        ----------
-        yname : str, optional
+        -----------
+        yname : string, optional
             Default is `y`
-        xname : list[str], optional
-            Names for the exogenous variables, default is `x#` for ## in p the
-            number of regressors. Must match the number of parameters in
-            the model
-        title : str, optional
+        xname : list of strings, optional
+            Default is `x#` for ## in p the number of regressors
+        title : string, optional
             Title for the top table. If not None, then this replaces
             the default title
         alpha : float
@@ -1596,14 +1568,16 @@ class PHRegResults(base.LikelihoodModelResults):
 
         See Also
         --------
-        statsmodels.iolib.summary2.Summary : class to hold summary results
+        statsmodels.iolib.summary.Summary : class to hold summary
+            results
         """
 
         from statsmodels.iolib import summary2
+        from statsmodels.compat.collections import OrderedDict
         smry = summary2.Summary()
         float_format = "%8.3f"
 
-        info = {}
+        info = OrderedDict()
         info["Model:"] = "PH Reg"
         if yname is None:
             yname = self.model.endog_names
@@ -1636,7 +1610,7 @@ class PHRegResults(base.LikelihoodModelResults):
         param.loc[:, a] = np.exp(param.loc[:, a])
         a = "%.3f]" % (1 - alpha / 2)
         param.loc[:, a] = np.exp(param.loc[:, a])
-        if xname is not None:
+        if xname != None:
             param.index = xname
         smry.add_df(param, float_format=float_format)
         smry.add_title(title=title, results=self)
@@ -1664,17 +1638,16 @@ class PHRegResults(base.LikelihoodModelResults):
 
         return smry
 
-
-class rv_discrete_float:
+class rv_discrete_float(object):
     """
     A class representing a collection of discrete distributions.
 
     Parameters
     ----------
-    xk : 2d array_like
+    xk : 2d array-like
         The support points, should be non-decreasing within each
         row.
-    pk : 2d array_like
+    pk : 2d array-like
         The probabilities, should sum to one within each row.
 
     Notes
@@ -1699,17 +1672,12 @@ class rv_discrete_float:
         self.pk = pk
         self.cpk = np.cumsum(self.pk, axis=1)
 
-    def rvs(self, n=None):
+    def rvs(self):
         """
         Returns a random sample from the discrete distribution.
 
         A vector is returned containing a single draw from each row of
         `xk`, using the probabilities of the corresponding row of `pk`
-
-        Parameters
-        ----------
-        n : not used
-            Present for signature compatibility
         """
 
         n = self.xk.shape[0]

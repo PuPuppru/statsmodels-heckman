@@ -8,7 +8,9 @@ Author: Josef Perktold
 
 import collections
 
-from statsmodels.tools.testing import Holder
+class Holder(object):
+    pass
+    #def __repr__(self):
 
 
 # numbers from R package `pwr` pwr.chisq.test

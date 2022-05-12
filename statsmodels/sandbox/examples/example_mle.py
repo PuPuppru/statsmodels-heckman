@@ -3,14 +3,13 @@
 TODO: compare standard error of parameter estimates
 '''
 
-import numpy as np
 from scipy import optimize
-
-import statsmodels.api as sm
-from statsmodels.datasets.longley import load
+import numpy as np
+import statsmodels.base.model as models
 
 print('\nExample 1: Artificial Data')
 print('--------------------------\n')
+import statsmodels.api as sm
 
 np.random.seed(54321)
 X = np.random.rand(40,2)
@@ -31,6 +30,7 @@ print(resfmin)
 print('\nExample 2: Longley Data, high multicollinearity')
 print('-----------------------------------------------\n')
 
+from statsmodels.datasets.longley import load
 data = load()
 data.exog = sm.add_constant(data.exog, prepend=False)
 mod = sm.OLS(data.endog, data.exog)
@@ -48,7 +48,7 @@ print('MLE')
 #resfmin2 = optimize.fmin(f, mod.results.params*0.9, maxfun=5000, maxiter=5000, xtol=1e-10, ftol= 1e-10)
 resfmin2 = optimize.fmin(f, np.ones(7), maxfun=5000, maxiter=5000, xtol=1e-10, ftol= 1e-10)
 print(resfmin2)
-# there is not a unique solution?  Is this due to the multicollinearity? Improved with use of analytically
+# there isn't a unique solution?  Is this due to the multicollinearity? Improved with use of analytically
 # defined score function?
 
 #check X'X matrix

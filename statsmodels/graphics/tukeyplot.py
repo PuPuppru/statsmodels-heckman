@@ -1,6 +1,8 @@
-import matplotlib.lines as lines
-import matplotlib.pyplot as plt
+from statsmodels.compat.python import range
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import matplotlib.lines as lines
 
 
 def tukeyplot(results, dim=None, yticklabels=None):
@@ -73,3 +75,4 @@ results = np.array([[-10.04391794,  26.34391794],
 
 
 #plt.show()
+

@@ -1,10 +1,12 @@
+from unittest import TestCase
+
 import numpy as np
 import numpy.testing as npt
 
 from statsmodels.sandbox.nonparametric.kernel_extras import SemiLinear
 
 
-class KernelExtrasTestBase:
+class KernelExtrasTestBase(TestCase):
     @classmethod
     def setup_class(cls):
         nobs = 60
@@ -73,6 +75,6 @@ class TestSemiLinear(KernelExtrasTestBase):
                            var_type='c', k_linear=1)
         b_hat = np.squeeze(model.b)
         # Only tests for the linear part of the regression
-        # Currently does not work well with the nonparametric part
+        # Currently doesn't work well with the nonparametric part
         # Needs some more work
         npt.assert_allclose(b1, b_hat, rtol=0.1)

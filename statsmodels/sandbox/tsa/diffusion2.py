@@ -71,9 +71,9 @@ TODO:
 
 
 random bug (showed up only once, need fuzz-testing to replicate)
-  File "../diffusion2.py", line 375, in <module>
+  File "...\diffusion2.py", line 375, in <module>
     x = jd.simulate(mu,sigma,lambd,a,D,ts,nrepl)
-  File "../diffusion2.py", line 129, in simulate
+  File "...\diffusion2.py", line 129, in simulate
     jumps_ts[n] = CumS[Events]
 IndexError: index out of bounds
 
@@ -87,7 +87,7 @@ import numpy as np
 #from scipy import stats  # currently only uses np.random
 import matplotlib.pyplot as plt
 
-class JumpDiffusionMerton:
+class JumpDiffusionMerton(object):
     '''
 
     Example
@@ -153,7 +153,7 @@ class JumpDiffusionMerton:
 
         return x
 
-class JumpDiffusionKou:
+class JumpDiffusionKou(object):
 
     def __init__(self):
         pass
@@ -200,7 +200,7 @@ class JumpDiffusionKou:
         return x
 
 
-class VG:
+class VG(object):
     '''variance gamma process
     '''
 
@@ -231,7 +231,7 @@ class VG:
         x = np.cumsum(dXs,1)
         return x
 
-class IG:
+class IG(object):
     '''inverse-Gaussian ??? used by NIG
     '''
 
@@ -250,7 +250,7 @@ class IG:
         return X.ravel()
 
 
-class NIG:
+class NIG(object):
     '''normal-inverse-Gaussian
     '''
 
@@ -266,9 +266,9 @@ class NIG:
             if t>1:
                 Dt=ts[t]-ts[t-1]
 
-            lfrac = 1/k*(Dt**2)
+            l = 1/k*(Dt**2)
             m = Dt
-            DS = IG().simulate(lfrac, m, nrepl)
+            DS = IG().simulate(l,m,nrepl)
             N = np.random.randn(nrepl)
 
             DX = s*N*np.sqrt(DS) + th*DS
@@ -278,7 +278,7 @@ class NIG:
         x = np.cumsum(DXs,1)
         return x
 
-class Heston:
+class Heston(object):
     '''Heston Stochastic Volatility
     '''
 
@@ -313,7 +313,7 @@ class Heston:
         x = np.cumsum(dXs,1)
         return x, vts
 
-class CIRSubordinatedBrownian:
+class CIRSubordinatedBrownian(object):
     '''CIR subordinated Brownian Motion
     '''
 
@@ -500,3 +500,6 @@ if __name__ == '__main__':
     plt.title('CIRSubordinatedBrownian')
 
     #plt.show()
+
+
+

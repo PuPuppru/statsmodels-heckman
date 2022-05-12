@@ -5,7 +5,7 @@ from statsmodels.stats.mediation import Mediation
 import pandas as pd
 from numpy.testing import assert_allclose
 import patsy
-import pytest
+
 
 # Compare to mediation R package vignette
 df = [['index', 'Estimate', 'Lower CI bound', 'Upper CI bound', 'P-value'],
@@ -51,7 +51,6 @@ df = [['index', 'Estimate', 'Lower CI bound', 'Upper CI bound', 'P-value'],
 framing_moderated_4231 = pd.DataFrame(df[1:], columns=df[0]).set_index('index')
 
 
-@pytest.mark.slow
 def test_framing_example():
 
     cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -119,7 +118,6 @@ def test_framing_example_moderator():
     med_rslt = med.fit(method='parametric', n_rep=100)
 
 
-@pytest.mark.slow
 def test_framing_example_formula():
 
     cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -145,7 +143,6 @@ def test_framing_example_formula():
     assert_allclose(diff, 0, atol=1e-6)
 
 
-@pytest.mark.slow
 def test_framing_example_moderator_formula():
 
     cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -165,107 +162,3 @@ def test_framing_example_moderator_formula():
     med_rslt = med.fit(method='parametric', n_rep=100)
     diff = np.asarray(med_rslt.summary() - framing_moderated_4231)
     assert_allclose(diff, 0, atol=1e-6)
-
-
-def test_mixedlm():
-
-    np.random.seed(3424)
-
-    n = 200
-
-    # The exposure (not time varying)
-    x = np.random.normal(size=n)
-    xv = np.outer(x, np.ones(3))
-
-    # The mediator (with random intercept)
-    mx = np.asarray([4., 4, 1])
-    mx /= np.sqrt(np.sum(mx**2))
-    med = mx[0] * np.outer(x, np.ones(3))
-    med += mx[1] * np.outer(np.random.normal(size=n), np.ones(3))
-    med += mx[2] * np.random.normal(size=(n, 3))
-
-    # The outcome (exposure and mediator effects)
-    ey = np.outer(x, np.r_[0, 0.5, 1]) + med
-
-    # Random structure of the outcome (random intercept and slope)
-    ex = np.asarray([5., 2, 2])
-    ex /= np.sqrt(np.sum(ex**2))
-    e = ex[0] * np.outer(np.random.normal(size=n), np.ones(3))
-    e += ex[1] * np.outer(np.random.normal(size=n), np.r_[-1, 0, 1])
-    e += ex[2] * np.random.normal(size=(n, 3))
-    y = ey + e
-
-    # Group membership
-    idx = np.outer(np.arange(n), np.ones(3))
-
-    # Time
-    tim = np.outer(np.ones(n), np.r_[-1, 0, 1])
-
-    df = pd.DataFrame({"y": y.flatten(), "x": xv.flatten(),
-                       "id": idx.flatten(), "time": tim.flatten(),
-                       "med": med.flatten()})
-
-    mediator_model = sm.MixedLM.from_formula("med ~ x", groups="id", data=df)
-    outcome_model = sm.MixedLM.from_formula("y ~ med + x", groups="id", data=df)
-    me = Mediation(outcome_model, mediator_model, "x", "med")
-    mr = me.fit(n_rep=2)
-    st = mr.summary()
-    pm = st.loc["Prop. mediated (average)", "Estimate"]
-    assert_allclose(pm, 0.52, rtol=1e-2, atol=1e-2)
-
-
-def test_surv():
-
-    np.random.seed(2341)
-
-    n = 1000
-
-    # Generate exposures
-    exp = np.random.normal(size=n)
-
-    # Generate mediators
-    mn = np.exp(exp)
-    mtime0 = -mn * np.log(np.random.uniform(size=n))
-    ctime = -2 * mn * np.log(np.random.uniform(size=n))
-    mstatus = (ctime >= mtime0).astype(int)
-    mtime = np.where(mtime0 <= ctime, mtime0, ctime)
-
-    for mt in "full", "partial", "no":
-
-        # Outcome
-        if mt == "full":
-            lp = 0.5*mtime0
-        elif mt == "partial":
-            lp = exp + mtime0
-        else:
-            lp = exp
-
-        # Generate outcomes
-        mn = np.exp(-lp)
-        ytime0 = -mn * np.log(np.random.uniform(size=n))
-        ctime = -2 * mn * np.log(np.random.uniform(size=n))
-        ystatus = (ctime >= ytime0).astype(int)
-        ytime = np.where(ytime0 <= ctime, ytime0, ctime)
-
-        df = pd.DataFrame({"ytime": ytime, "ystatus": ystatus,
-                           "mtime": mtime, "mstatus": mstatus,
-                           "exp": exp})
-
-        fml = "ytime ~ exp + mtime"
-        outcome_model = sm.PHReg.from_formula(fml, status="ystatus", data=df)
-        fml = "mtime ~ exp"
-        mediator_model = sm.PHReg.from_formula(fml, status="mstatus", data=df)
-
-        med = Mediation(outcome_model, mediator_model, "exp", "mtime",
-                        outcome_predict_kwargs={"pred_only": True},
-                        outcome_fit_kwargs={"method": "lbfgs"},
-                        mediator_fit_kwargs={"method": "lbfgs"})
-        med_result = med.fit(n_rep=2)
-        dr = med_result.summary()
-        pm = dr.loc["Prop. mediated (average)", "Estimate"]
-        if mt == "no":
-            assert_allclose(pm, 0, atol=0.1, rtol=0.1)
-        elif mt == "full":
-            assert_allclose(pm, 1, atol=0.1, rtol=0.1)
-        else:
-            assert_allclose(pm, 0.5, atol=0.1, rtol=0.1)

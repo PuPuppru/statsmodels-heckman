@@ -10,7 +10,7 @@ def _conf_set(F, alpha=.05):
 
     Parameters
     ----------
-    F : array_like
+    F : array-like
         The empirical distributions
     alpha : float
         Set alpha for a (1 - alpha) % confidence band.
@@ -31,7 +31,7 @@ def _conf_set(F, alpha=.05):
     upper = np.clip(F + epsilon, 0, 1)
     return lower, upper
 
-class StepFunction:
+class StepFunction(object):
     """
     A basic step function.
 
@@ -41,8 +41,8 @@ class StepFunction:
 
     Parameters
     ----------
-    x : array_like
-    y : array_like
+    x : array-like
+    y : array-like
     ival : float
         ival is the value given to the values to the left of x[0]. Default
         is 0.
@@ -111,7 +111,7 @@ class ECDF(StepFunction):
 
     Parameters
     ----------
-    x : array_like
+    x : array-like
         Observations
     side : {'left', 'right'}, optional
         Default is 'right'. Defines the shape of the intervals constituting the
@@ -132,18 +132,15 @@ class ECDF(StepFunction):
     array([ 0.75,  1.  ,  0.  ,  0.25])
     """
     def __init__(self, x, side='right'):
-        x = np.array(x, copy=True)
-        x.sort()
-        nobs = len(x)
-        y = np.linspace(1./nobs,1,nobs)
-        super(ECDF, self).__init__(x, y, side=side, sorted=True)
-        # TODO: make `step` an arg and have a linear interpolation option?
-        # This is the path with `step` is True
-        # If `step` is False, a previous version of the code read
-        #  `return interp1d(x,y,drop_errors=False,fill_values=ival)`
-        # which would have raised a NameError if hit, so would need to be
-        # fixed.  See GH#5701.
-
+        step = True
+        if step: #TODO: make this an arg and have a linear interpolation option?
+            x = np.array(x, copy=True)
+            x.sort()
+            nobs = len(x)
+            y = np.linspace(1./nobs,1,nobs)
+            super(ECDF, self).__init__(x, y, side=side, sorted=True)
+        else:
+            return interp1d(x,y,drop_errors=False,fill_values=ival)
 
 def monotone_fn_inverter(fn, x, vectorized=True, **keywords):
     """
@@ -167,7 +164,7 @@ def monotone_fn_inverter(fn, x, vectorized=True, **keywords):
 if __name__ == "__main__":
     #TODO: Make sure everything is correctly aligned and make a plotting
     # function
-    from urllib.request import urlopen
+    from statsmodels.compat.python import urlopen
     import matplotlib.pyplot as plt
     nerve_data = urlopen('http://www.statsci.org/data/general/nerve.txt')
     nerve_data = np.loadtxt(nerve_data)
@@ -175,11 +172,12 @@ if __name__ == "__main__":
     cdf = ECDF(x)
     x.sort()
     F = cdf(x)
-    plt.step(x, F, where='post')
+    plt.step(x, F)
     lower, upper = _conf_set(F)
-    plt.step(x, lower, 'r', where='post')
-    plt.step(x, upper, 'r', where='post')
+    plt.step(x, lower, 'r')
+    plt.step(x, upper, 'r')
     plt.xlim(0, 1.5)
     plt.ylim(0, 1.05)
     plt.vlines(x, 0, .05)
     plt.show()
+

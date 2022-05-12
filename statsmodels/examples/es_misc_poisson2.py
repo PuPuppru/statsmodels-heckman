@@ -1,15 +1,14 @@
 
+from __future__ import print_function
 import numpy as np
-
+from numpy.testing import assert_almost_equal
 import statsmodels.api as sm
 from statsmodels.miscmodels.count import (PoissonGMLE, PoissonOffsetGMLE,
                                           PoissonZiGMLE)
-from statsmodels.discrete.discrete_model import Poisson
-
 
 DEC = 3
 
-class Dummy:
+class Dummy(object):
     pass
 
 self = Dummy()
@@ -24,6 +23,7 @@ xbeta = 1 + 0.1*rvs.sum(1)
 data_endog = np.random.poisson(np.exp(xbeta))
 
 #estimate discretemod.Poisson as benchmark
+from statsmodels.discrete.discrete_model import Poisson
 res_discrete = Poisson(data_endog, data_exog).fit()
 
 mod_glm = sm.GLM(data_endog, data_exog, family=sm.families.Poisson())

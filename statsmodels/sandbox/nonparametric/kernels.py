@@ -18,14 +18,14 @@ http://fedc.wiwi.hu-berlin.de/xplore/ebooks/html/anr/anrhtmlframe62.html
 # pylint: disable-msg=W0142
 # pylint: disable-msg=E1101
 # pylint: disable-msg=E0611
-from statsmodels.compat.python import lzip, lfilter
+from statsmodels.compat.python import lzip, lfilter, callable, zip
 import numpy as np
 import scipy.integrate
-from scipy.special import factorial
+from scipy.misc import factorial
 from numpy import exp, multiply, square, divide, subtract, inf
 
 
-class NdKernel:
+class NdKernel(object):
     """Generic N-dimensial kernel
 
     Parameters
@@ -74,7 +74,7 @@ class NdKernel:
 
         if len(xs)>0:  ## Need to do product of marginal distributions
             #w = np.sum([self(self._Hrootinv * (xx-x).T ) for xx in xs])/n
-            #vectorized does not work:
+            #vectorized doesn't work:
             if self.weights is not None:
                 w = np.mean(self((xs-x) * self._Hrootinv).T * self.weights)/sum(self.weights)
             else:
@@ -105,7 +105,7 @@ class NdKernel:
         return self._kernweight(x)
 
 
-class CustomKernel:
+class CustomKernel(object):
     """
     Generic 1D Kernel object.
     Can be constructed by selecting a standard named Kernel,
@@ -120,7 +120,7 @@ class CustomKernel:
         """
         shape should be a function taking and returning numeric type.
 
-        For sanity it should always return positive or zero but this is not
+        For sanity it should always return positive or zero but this isn't
         enforced in case you want to do weird things. Bear in mind that the
         statistical tests etc. may not be valid for non-positive kernels.
 
@@ -170,7 +170,7 @@ class CustomKernel:
         def isInDomain(xy):
             """Used for filter to check if point is in the domain"""
             u = (xy[0]-x)/self.h
-            return np.all((u >= self.domain[0]) & (u <= self.domain[1]))
+            return u >= self.domain[0] and u <= self.domain[1]
 
         if self.domain is None:
             return (xs, ys)
@@ -256,6 +256,7 @@ class CustomKernel:
         This uses the asymptotic normal approximation to the distribution of
         the density estimate. The lower bound can be negative for density
         values close to zero.
+
         """
         from scipy import stats
         crit = stats.norm.isf(alpha / 2.)
@@ -449,7 +450,7 @@ class Biweight(CustomKernel):
         xs and y-values ys.
         Not expected to be called by the user.
 
-        Special implementation optimized for Biweight.
+        Special implementation optimised for Biweight.
         """
         xs, ys = self.in_domain(xs, ys, x)
 
@@ -527,7 +528,7 @@ class Gaussian(CustomKernel):
         xs and y-values ys.
         Not expected to be called by the user.
 
-        Special implementation optimized for Gaussian.
+        Special implementation optimised for Gaussian.
         """
         w = np.sum(exp(multiply(square(divide(subtract(xs, x),
                                               self.h)),-0.5)))
@@ -562,17 +563,4 @@ class Cosine2(CustomKernel):
                 , h=h, domain=[-0.5, 0.5], norm = 1.0)
         self._L2Norm = 1.5
         self._kernel_var = 0.03267274151216444  # = 1/12. - 0.5 / np.pi**2
-        self._order = 2
-
-class Tricube(CustomKernel):
-    """
-    Tricube Kernel
-
-    K(u) = 0.864197530864 * (1 - abs(x)**3)**3 between -1.0 and 1.0
-    """
-    def __init__(self,h=1.0):
-        CustomKernel.__init__(self,shape=lambda x: 0.864197530864 * (1 - abs(x)**3)**3,
-                              h=h, domain=[-1.0, 1.0], norm = 1.0)
-        self._L2Norm = 175.0/247.0
-        self._kernel_var = 35.0/243.0
         self._order = 2

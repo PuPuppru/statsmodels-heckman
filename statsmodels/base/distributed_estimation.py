@@ -33,7 +33,7 @@ which follows the methods outlined in
 
 Jason D. Lee, Qiang Liu, Yuekai Sun and Jonathan E. Taylor.
 "Communication-Efficient Sparse Regression: A One-Shot Approach."
-arXiv:1503.04337. 2015. https://arxiv.org/abs/1503.04337.
+arXiv:1503.04337. 2015. http://arxiv.org/abs/1503.04337.
 
 There are several variables that are taken from the source paper
 for which the interpretation may not be directly clear from the
@@ -88,7 +88,7 @@ def _est_regularized_naive(mod, pnum, partitions, fit_kwds=None):
 
     Returns
     -------
-    An array of the parameters for the regularized fit
+    An array of the paramters for the regularized fit
     """
 
     if fit_kwds is None:
@@ -156,9 +156,9 @@ def _calc_grad(mod, params, alpha, L1_wt, score_kwds):
     ----------
     mod : statsmodels model class instance
         The model for the current partition.
-    params : array_like
+    params : array-like
         The estimated coefficients for the current partition.
-    alpha : scalar or array_like
+    alpha : scalar or array-like
         The penalty weight.  If a scalar, the same penalty weight
         applies to all variables in the model.  If a vector, it
         must have the same length as `params`, and contains a
@@ -200,7 +200,7 @@ def _calc_wdesign_mat(mod, params, hess_kwds):
     ----------
     mod : statsmodels model class instance
         The model for the current partition.
-    params : array_like
+    params : array-like
         The estimated coefficients for the current partition.
     hess_kwds : dict-like or None
         Keyword arguments for the hessian function.
@@ -329,7 +329,7 @@ def _helper_fit_partition(self, pnum, endog, exog, fit_kwds,
                           init_kwds_e={}):
     """handles the model fitting for each machine. NOTE: this
     is primarily handled outside of DistributedModel because
-    joblib cannot handle class methods.
+    joblib can't handle class methods.
 
     Parameters
     ----------
@@ -337,9 +337,9 @@ def _helper_fit_partition(self, pnum, endog, exog, fit_kwds,
         An instance of DistributedModel.
     pnum : scalar
         index of current partition.
-    endog : array_like
+    endog : array-like
         endogenous data for current partition.
-    exog : array_like
+    exog : array-like
         exogenous data for current partition.
     fit_kwds : dict-like
         Keywords needed for the model fitting.
@@ -362,7 +362,7 @@ def _helper_fit_partition(self, pnum, endog, exog, fit_kwds,
     return results
 
 
-class DistributedModel:
+class DistributedModel(object):
     __doc__ = """
     Distributed model class
 
@@ -419,11 +419,11 @@ class DistributedModel:
     results_kwds : dict-like
         See Parameters.
 
-    Notes
-    -----
-
     Examples
     --------
+
+    Notes
+    -----
     """
 
     def __init__(self, partitions, model_class=None,
@@ -635,17 +635,19 @@ class DistributedModel:
 
 
 class DistributedResults(LikelihoodModelResults):
+
     """
     Class to contain model results
 
     Parameters
     ----------
     model : class instance
-        Class instance for model used for distributed data,
+        class instance for model used for distributed data,
         this particular instance uses fake data and is really
         only to allow use of methods like predict.
-    params : ndarray
-        Parameter estimates from the fit model.
+    params : array
+        parameter estimates from the fit model.
+
     """
 
     def __init__(self, model, params):
@@ -657,21 +659,19 @@ class DistributedResults(LikelihoodModelResults):
 
         Parameters
         ----------
-        exog : array_like NOT optional
+        exog : array-like NOT optional
             The values for which we want to predict, unlike standard
             predict this is NOT optional since the data in self.model
             is fake.
-        *args :
-            Some models can take additional arguments. See the
-            predict method of the model for the details.
-        **kwargs :
-            Some models can take additional keywords arguments. See the
+        args, kwargs :
+            Some models can take additional arguments or keywords, see the
             predict method of the model for the details.
 
         Returns
         -------
             prediction : ndarray, pandas.Series or pandas.DataFrame
             See self.model.predict
+
         """
 
         return self.model.predict(self.params, exog, *args, **kwargs)

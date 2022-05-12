@@ -12,10 +12,10 @@ Author: Josef Perktold
 import numpy as np
 from numpy.testing import assert_almost_equal
 
-from statsmodels.regression.linear_model import OLS
+from statsmodels.regression.linear_model import OLS, GLSAR
 from statsmodels.tools.tools import add_constant
 import statsmodels.stats.sandwich_covariance as sw
-
+#import statsmodels.sandbox.panel.sandwich_covariance_generic as swg
 
 def test_cov_cluster_2groups():
     #comparing cluster robust standard errors to Peterson
@@ -55,10 +55,10 @@ def test_cov_cluster_2groups():
 def test_hac_simple():
 
     from statsmodels.datasets import macrodata
-    d2 = macrodata.load_pandas().data
-    g_gdp = 400*np.diff(np.log(d2['realgdp'].values))
-    g_inv = 400*np.diff(np.log(d2['realinv'].values))
-    exogg = add_constant(np.c_[g_gdp, d2['realint'][:-1].values])
+    d2 = macrodata.load().data
+    g_gdp = 400*np.diff(np.log(d2['realgdp']))
+    g_inv = 400*np.diff(np.log(d2['realinv']))
+    exogg = add_constant(np.c_[g_gdp, d2['realint'][:-1]])
     res_olsg = OLS(g_inv, exogg).fit()
 
 
@@ -88,3 +88,8 @@ def test_hac_simple():
     cov3 = sw.cov_hac_simple(res_olsg, use_correction=False)
     cov4 = sw.cov_hac_simple(res_olsg, nlags=4, use_correction=False)
     assert_almost_equal(cov3, cov4, decimal=14)
+
+if __name__ == '__main__':
+    import nose
+    nose.runmodule(argv=[__file__, '-vvs', '-x'], exit=False)
+    #test_hac_simple()

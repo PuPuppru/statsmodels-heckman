@@ -8,18 +8,17 @@ Author: Padarn Wilson
 """
 
 # Load the Statewide Crime data set and perform linear regression with
-#    'poverty' and 'hs_grad' as variables and 'murder' as the response
+#    'poverty' and 'hs_grad' as variables and 'muder' as the response
 
 
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import numpy as np
 
-import statsmodels.api as sm
-
 data = sm.datasets.statecrime.load_pandas().data
 murder = data['murder']
-X = data[['poverty', 'hs_grad']].copy()
-X['constant'] = 1
+X = data[['poverty', 'hs_grad']]
+X["constant"] = 1
 
 y = murder
 model = sm.OLS(y, X)

@@ -5,9 +5,7 @@
 ANOVA
 =====
 
-Analysis of Variance models containing anova_lm for ANOVA analysis with a
-linear OLSModel, and AnovaRM for repeated measures ANOVA, within ANOVA for
-balanced data.
+Analysis of Variance models 
 
 Examples
 --------
@@ -17,7 +15,7 @@ Examples
     import statsmodels.api as sm
     from statsmodels.formula.api import ols
 
-    moore = sm.datasets.get_rdataset("Moore", "carData",
+    moore = sm.datasets.get_rdataset("Moore", "car",
                                      cache=True) # load data
     data = moore.data
     data = data.rename(columns={"partner.status":
@@ -28,7 +26,7 @@ Examples
     table = sm.stats.anova_lm(moore_lm, typ=2) # Type 2 ANOVA DataFrame
     print(table)
 
-A more detailed example for `anova_lm` can be found here:
+A more detailed example can be found here:
 
 *  `ANOVA <examples/notebooks/generated/interactions_anova.html>`__
 
@@ -42,4 +40,3 @@ Module Reference
    :toctree: generated/
 
    anova_lm
-   AnovaRM

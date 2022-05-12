@@ -16,9 +16,10 @@ the sum of squared differences (Frobenious norm without taking the square root)
 
 """
 
+from __future__ import print_function
 import numpy as np
 from statsmodels.stats.correlation_tools import (
-                 corr_nearest, corr_clipped)
+                 corr_nearest, corr_clipped, cov_nearest)
 
 examples = ['all']
 

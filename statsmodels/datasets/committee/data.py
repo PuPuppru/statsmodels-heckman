@@ -1,5 +1,4 @@
 """First 100 days of the US House of Representatives 1995"""
-from statsmodels.datasets import utils as du
 
 __docformat__ = 'restructuredtext'
 
@@ -46,24 +45,28 @@ NOTE = """::
     returned by load.
 """
 
-
-def load_pandas():
-    data = _get_data()
-    return du.process_pandas(data, endog_idx=0)
-
+from numpy import recfromtxt, column_stack, array
+from statsmodels.datasets import utils as du
+from os.path import dirname, abspath
 
 def load():
     """Load the committee data and returns a data class.
 
     Returns
-    -------
-    Dataset
+    --------
+    Dataset instance:
         See DATASET_PROPOSAL.txt for more information.
     """
-    return load_pandas()
+    data = _get_data()
+    return du.process_recarray(data, endog_idx=0, dtype=float)
 
+def load_pandas():
+    data = _get_data()
+    return du.process_recarray_pandas(data, endog_idx=0, dtype=float)
 
 def _get_data():
-    data = du.load_csv(__file__, 'committee.csv')
-    data = data.iloc[:, 1:7].astype(float)
+    filepath = dirname(abspath(__file__))
+    with open(filepath + '/committee.csv', 'rb') as f:
+        data = recfromtxt(f, delimiter=",",
+                          names=True, dtype=float, usecols=(1,2,3,4,5,6))
     return data

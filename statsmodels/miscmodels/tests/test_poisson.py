@@ -2,11 +2,8 @@
 
 
 '''
-import pytest
 import numpy as np
 from numpy.testing import assert_almost_equal
-from scipy import stats
-
 import statsmodels.api as sm
 from statsmodels.miscmodels.count import PoissonGMLE, PoissonOffsetGMLE, \
                         PoissonZiGMLE
@@ -18,7 +15,7 @@ DEC = 4
 DEC4 = 4
 DEC5 = 5
 
-class CompareMixin:
+class CompareMixin(object):
 
     def test_params(self):
         assert_almost_equal(self.res.params, self.res_glm.params, DEC5)
@@ -45,15 +42,14 @@ class CompareMixin:
         assert_almost_equal(tt.tvalue, self.res.tvalues, DEC)
         assert_almost_equal(pvalue, self.res.pvalues, DEC)
 
-    @pytest.mark.smoke
     def test_summary(self):
+        # SMOKE test
         self.res.summary()
 
 
 class TestPoissonMLE(CompareMixin):
 
-    @classmethod
-    def setup_class(cls):
+    def __init__(self):
 
         # generate artificial data
         np.random.seed(98765678)
@@ -65,40 +61,23 @@ class TestPoissonMLE(CompareMixin):
         data_endog = np.random.poisson(np.exp(xbeta))
 
         #estimate discretemod.Poisson as benchmark
-        cls.res_discrete = Poisson(data_endog, data_exog).fit(disp=0)
+        self.res_discrete = Poisson(data_endog, data_exog).fit(disp=0)
 
         mod_glm = sm.GLM(data_endog, data_exog, family=sm.families.Poisson())
-        cls.res_glm = mod_glm.fit()
+        self.res_glm = mod_glm.fit()
 
         #estimate generic MLE
-        cls.mod = PoissonGMLE(data_endog, data_exog)
-        cls.res = cls.mod.fit(start_params=0.9 * cls.res_discrete.params,
+        self.mod = PoissonGMLE(data_endog, data_exog)
+        self.res = self.mod.fit(start_params=0.9 * self.res_discrete.params,
                                 method='bfgs', disp=0)
 
-    def test_predict_distribution(self):
-        res = self.res
-        model = self.mod
 
-        with pytest.raises(ValueError):
-            # No "result" attribute
-            model.predict_distribution(model.exog)
-
-        try:
-            model.result = res
-            dist = model.predict_distribution(model.exog)
-            assert isinstance(dist, stats._distn_infrastructure.rv_frozen)
-            assert_almost_equal(dist.mean(),
-                                np.exp(model.exog.dot(res.params)),
-                                15)
-        finally:
-            # leave the model object how we found it
-            model.__delattr__("result")
 
 
 class TestPoissonOffset(CompareMixin):
     #this uses the first exog to construct an offset variable
-    @classmethod
-    def setup_class(cls):
+    def __init__(self):
+
         # generate artificial data
         np.random.seed(98765678)
         nobs = 200
@@ -109,26 +88,26 @@ class TestPoissonOffset(CompareMixin):
         data_endog = np.random.poisson(np.exp(xbeta))
 
         mod_glm = sm.GLM(data_endog, data_exog, family=sm.families.Poisson())
-        cls.res_glm = mod_glm.fit()
+        self.res_glm = mod_glm.fit()
 
         #estimate generic MLE
-        #cls.mod = PoissonGMLE(data_endog, data_exog)
-        #res = cls.mod.fit()
+        #self.mod = PoissonGMLE(data_endog, data_exog)
+        #res = self.mod.fit()
 
         #create offset variable based on first exog
-        cls.res_discrete = Poisson(data_endog, data_exog).fit(disp=0)
-        offset = cls.res_discrete.params[0] * data_exog[:,0]  #1d ???
+        self.res_discrete = Poisson(data_endog, data_exog).fit(disp=0)
+        offset = self.res_discrete.params[0] * data_exog[:,0]  #1d ???
 
         #estimate discretemod.Poisson as benchmark, now has offset
-        cls.res_discrete = Poisson(data_endog, data_exog[:,1:],
+        self.res_discrete = Poisson(data_endog, data_exog[:,1:],
                                     offset=offset).fit(disp=0)
 
         mod_glm = sm.GLM(data_endog, data_exog, family=sm.families.Poisson())
-        cls.res_glm = mod_glm.fit()
+        self.res_glm = mod_glm.fit()
 
-        #cls.res = PoissonOffsetGMLE(data_endog, data_exog[:,1:], offset=offset).fit(start_params = np.ones(6)/2., method='nm')
+        #self.res = PoissonOffsetGMLE(data_endog, data_exog[:,1:], offset=offset).fit(start_params = np.ones(6)/2., method='nm')
         modo = PoissonOffsetGMLE(data_endog, data_exog[:,1:], offset=offset)
-        cls.res = modo.fit(start_params = 0.9*cls.res_discrete.params,
+        self.res = modo.fit(start_params = 0.9*self.res_discrete.params,
                             method='bfgs', disp=0)
 
 
@@ -147,8 +126,7 @@ class TestPoissonOffset(CompareMixin):
 #DEC = DEC - 1
 class TestPoissonZi(CompareMixin):
     #this uses the first exog to construct an offset variable
-    @classmethod
-    def setup_class(cls):
+    def __init__(self):
 
         # generate artificial data
         np.random.seed(98765678)
@@ -161,25 +139,25 @@ class TestPoissonZi(CompareMixin):
 
 
         mod_glm = sm.GLM(data_endog, data_exog, family=sm.families.Poisson())
-        cls.res_glm = mod_glm.fit()
+        self.res_glm = mod_glm.fit()
 
         #estimate generic MLE
-        #cls.mod = PoissonGMLE(data_endog, data_exog)
-        #res = cls.mod.fit()
+        #self.mod = PoissonGMLE(data_endog, data_exog)
+        #res = self.mod.fit()
 
         #create offset variable based on first exog
-        cls.res_discrete = Poisson(data_endog, data_exog).fit(disp=0)
-        offset = cls.res_discrete.params[0] * data_exog[:,0]  #1d ???
+        self.res_discrete = Poisson(data_endog, data_exog).fit(disp=0)
+        offset = self.res_discrete.params[0] * data_exog[:,0]  #1d ???
 
         #estimate discretemod.Poisson as benchmark, now has offset
-        cls.res_discrete = Poisson(data_endog, data_exog[:,1:], offset=offset).fit(disp=0)
+        self.res_discrete = Poisson(data_endog, data_exog[:,1:], offset=offset).fit(disp=0)
 
         # Note : ZI has one extra parameter
-        cls.res = PoissonZiGMLE(data_endog, data_exog[:,1:], offset=offset).fit(
-                            start_params=np.r_[0.9*cls.res_discrete.params,10],
+        self.res = PoissonZiGMLE(data_endog, data_exog[:,1:], offset=offset).fit(
+                            start_params=np.r_[0.9*self.res_discrete.params,10],
                             method='bfgs', disp=0)
 
-        cls.decimal = 4
+        self.decimal = 4
 
     def test_params(self):
         assert_almost_equal(self.res.params[:-1], self.res_glm.params[1:], self.decimal)
@@ -199,3 +177,4 @@ class TestPoissonZi(CompareMixin):
         from numpy.testing import assert_warns
         mod1.data.xnames = mod1.data.xnames * 2
         assert_warns(ValueWarning, mod1.fit, disp=0)
+

@@ -7,14 +7,9 @@ Author: Josef Perktold
 """
 
 import numpy as np
-from numpy.testing import assert_almost_equal, assert_equal, assert_
-import pytest
-
 import statsmodels.stats.weightstats as smws
 
-
-from statsmodels.tools.testing import Holder
-
+from numpy.testing import assert_almost_equal, assert_equal, assert_
 
 def assert_almost_equal_inf(x, y, decimal=6, msg=None):
     x = np.atleast_1d(x)
@@ -24,6 +19,10 @@ def assert_almost_equal_inf(x, y, decimal=6, msg=None):
     assert_equal(np.isnan(x), np.isnan(y))
     assert_almost_equal(x[np.isfinite(x)], y[np.isfinite(y)])
 
+
+
+class Holder(object):
+    pass
 
 raw_clinic = '''\
 1     1 2.84 4.00 3.45 2.55 2.46
@@ -369,7 +368,7 @@ res2 = smws.ttost_paired(clinic[:15, 3], clinic[15:, 3], -0.6, 0.6, transform=No
 res = smws.ttost_ind(clinic[:15, 3], clinic[15:, 3], -0.6, 0.6, usevar='unequal')
 
 
-class CheckTostMixin:
+class CheckTostMixin(object):
 
     def test_pval(self):
         assert_almost_equal(self.res1.pvalue, self.res2.p_value, decimal=13)
@@ -377,22 +376,21 @@ class CheckTostMixin:
 
 class TestTostp1(CheckTostMixin):
     #paired var1
-    @classmethod
-    def setup_class(cls):
-        cls.res2 = tost_clinic_paired_1
+    def __init__(self):
+        self.res2 = tost_clinic_paired_1
         x1, x2 = clinic[:15, 2], clinic[15:, 2]
-        cls.res1 = Holder()
+        self.res1 = Holder()
         res = smws.ttost_paired(x1, x2, -0.6, 0.6, transform=None)
-        cls.res1.pvalue = res[0]
-        #cls.res1.df = res[1][-1] not yet
+        self.res1.pvalue = res[0]
+        #self.res1.df = res[1][-1] not yet
         res_ds = smws.DescrStatsW(x1 - x2, weights=None, ddof=0)
         #tost confint 2*alpha TODO: check again
-        cls.res1.tconfint_diff = res_ds.tconfint_mean(0.1)
-        cls.res1.confint_05 = res_ds.tconfint_mean(0.05)
-        cls.res1.mean_diff = res_ds.mean
-        cls.res1.std_mean_diff = res_ds.std_mean
+        self.res1.tconfint_diff = res_ds.tconfint_mean(0.1)
+        self.res1.confint_05 = res_ds.tconfint_mean(0.05)
+        self.res1.mean_diff = res_ds.mean
+        self.res1.std_mean_diff = res_ds.std_mean
 
-        cls.res2b = ttest_clinic_paired_1
+        self.res2b = ttest_clinic_paired_1
 
     def test_special(self):
         #TODO: add attributes to other cases and move to superclass
@@ -409,49 +407,44 @@ class TestTostp1(CheckTostMixin):
 
 class TestTostp2(CheckTostMixin):
     #paired var2
-    @classmethod
-    def setup_class(cls):
-        cls.res2 = tost_clinic_paired
+    def __init__(self):
+        self.res2 = tost_clinic_paired
         x, y = clinic[:15, 3], clinic[15:, 3]
-        cls.res1 = Holder()
+        self.res1 = Holder()
         res = smws.ttost_paired(x, y, -0.6, 0.6, transform=None)
-        cls.res1.pvalue = res[0]
+        self.res1.pvalue = res[0]
 
 class TestTosti1(CheckTostMixin):
-    @classmethod
-    def setup_class(cls):
-        cls.res2 = tost_clinic_indep_1
+    def __init__(self):
+        self.res2 = tost_clinic_indep_1
         x, y = clinic[:15, 2], clinic[15:, 2]
-        cls.res1 = Holder()
+        self.res1 = Holder()
         res = smws.ttost_ind(x, y, -0.6, 0.6, usevar='unequal')
-        cls.res1.pvalue = res[0]
+        self.res1.pvalue = res[0]
 
 class TestTosti2(CheckTostMixin):
-    @classmethod
-    def setup_class(cls):
-        cls.res2 = tost_clinic_indep
+    def __init__(self):
+        self.res2 = tost_clinic_indep
         x, y = clinic[:15, 3], clinic[15:, 3]
-        cls.res1 = Holder()
+        self.res1 = Holder()
         res = smws.ttost_ind(x, y, -0.6, 0.6, usevar='unequal')
-        cls.res1.pvalue = res[0]
+        self.res1.pvalue = res[0]
 
 class TestTostip1(CheckTostMixin):
-    @classmethod
-    def setup_class(cls):
-        cls.res2 = tost_clinic_indep_1_pooled
+    def __init__(self):
+        self.res2 = tost_clinic_indep_1_pooled
         x, y = clinic[:15, 2], clinic[15:, 2]
-        cls.res1 = Holder()
+        self.res1 = Holder()
         res = smws.ttost_ind(x, y, -0.6, 0.6, usevar='pooled')
-        cls.res1.pvalue = res[0]
+        self.res1.pvalue = res[0]
 
 class TestTostip2(CheckTostMixin):
-    @classmethod
-    def setup_class(cls):
-        cls.res2 = tost_clinic_indep_2_pooled
+    def __init__(self):
+        self.res2 = tost_clinic_indep_2_pooled
         x, y = clinic[:15, 3], clinic[15:, 3]
-        cls.res1 = Holder()
+        self.res1 = Holder()
         res = smws.ttost_ind(x, y, -0.6, 0.6, usevar='pooled')
-        cls.res1.pvalue = res[0]
+        self.res1.pvalue = res[0]
 
 #transform=np.log
 #class TestTostp1_log(CheckTost):
@@ -479,7 +472,7 @@ def test_tost_asym():
 
     #SMOKE tests: foe multi-endpoint vectorized, k on k
     resall = smws.ttost_ind(clinic[15:, 2:7], clinic[:15, 2:7],
-                           np.exp([-1.0, -1.0, -1.5, -1.5, -1.5]), 0.6,
+                           [-1.0, -1.0, -1.5, -1.5, -1.5], 0.6,
                            usevar='unequal', transform=np.log)
     resall = smws.ttost_ind(clinic[15:, 2:7], clinic[:15, 2:7],
                            [-1.0, -1.0, -1.5, -1.5, -1.5], 0.6,
@@ -544,10 +537,7 @@ def test_ttest():
     assert_(cm.d1 is cm2.d1)
     assert_(cm.d1 is cm3.d1)
 
-
-@pytest.mark.xfail(reason="shape mismatch between res1[1:] and res_sas[1:]",
-                   raises=AssertionError, strict=True)
-def test_tost_transform_paired():
+def tost_transform_paired():
     raw = np.array('''\
        103.4 90.11  59.92 77.71  68.17 77.71  94.54 97.51
        69.48 58.21  72.17 101.3  74.37 79.84  84.44 96.06
@@ -561,3 +551,18 @@ def test_tost_transform_paired():
     assert_almost_equal(res1[1:], res_sas[1:], 2)
     #result R tost
     assert_almost_equal(res1[0], tost_s_paired.p_value, 13)
+
+if __name__ == '__main__':
+    tt = TestTostp1()
+    tt.test_special()
+    for cls in [TestTostp1, TestTostp2, TestTosti1, TestTosti2,
+                TestTostip1, TestTostip2]:
+        #print cls
+        tt = cls()
+        tt.test_pval()
+
+    test_ttest()
+    tost_transform_paired()
+    test_tost_log()
+
+

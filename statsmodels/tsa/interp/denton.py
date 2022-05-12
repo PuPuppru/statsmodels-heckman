@@ -1,17 +1,18 @@
 
 import numpy as np
-from numpy import (dot, eye, diag_indices, zeros, ones, diag,
+from numpy import (dot, eye, diag_indices, zeros, column_stack, ones, diag,
         asarray, r_)
-from numpy.linalg import solve
+from numpy.linalg import inv, solve
+#from scipy.linalg import block_diag
+from scipy import linalg
 
-
-# def denton(indicator, benchmark, freq="aq", **kwarg):
+#def denton(indicator, benchmark, freq="aq", **kwarg):
 #    """
 #    Denton's method to convert low-frequency to high frequency data.
 #
 #    Parameters
 #    ----------
-#    benchmark : array_like
+#    benchmark : array-like
 #        The higher frequency benchmark.  A 1d or 2d data series in columns.
 #        If 2d, then M series are assumed.
 #    indicator
@@ -29,7 +30,7 @@ from numpy.linalg import solve
 #            `freq` == "other".
 #    Returns
 #    -------
-#    benchmarked series : ndarray
+#    benchmarked series : array
 #
 #    Notes
 #    -----
@@ -92,36 +93,34 @@ def dentonm(indicator, benchmark, freq="aq", **kwargs):
 
     Parameters
     ----------
-    indicator : array_like
+    indicator
         A low-frequency indicator series.  It is assumed that there are no
         pre-sample indicators.  Ie., the first indicators line up with
         the first benchmark.
-    benchmark : array_like
+    benchmark : array-like
         The higher frequency benchmark.  A 1d or 2d data series in columns.
         If 2d, then M series are assumed.
     freq : str {"aq","qm", "other"}
-        The frequency to use in the conversion.
-
-        * "aq" - Benchmarking an annual series to quarterly.
-        * "mq" - Benchmarking a quarterly series to monthly.
-        * "other" - Custom stride.  A kwarg, k, must be supplied.
-    **kwargs
-        Additional keyword argument. For example:
-
-        * k, an int, the number of high-frequency observations that sum to make
-          an aggregate low-frequency observation. `k` is used with
-          `freq` == "other".
-
+        "aq" - Benchmarking an annual series to quarterly.
+        "mq" - Benchmarking a quarterly series to monthly.
+        "other" - Custom stride.  A kwarg, k, must be supplied.
+    kwargs :
+        k : int
+            The number of high-frequency observations that sum to make an
+            aggregate low-frequency observation. `k` is used with
+            `freq` == "other".
     Returns
     -------
-    transformed : ndarray
-        The transformed series.
+    benchmarked series : array
 
     Examples
     --------
     >>> indicator = [50,100,150,100] * 5
     >>> benchmark = [500,400,300,400,500]
     >>> benchmarked = dentonm(indicator, benchmark, freq="aq")
+
+
+
 
     Notes
     -----
@@ -140,6 +139,7 @@ def dentonm(indicator, benchmark, freq="aq", **kwargs):
 
     sum(X) = A, for each period.  Where X is the benchmarked series, I is
     the indicator, and A is the benchmark.
+
 
     References
     ----------
@@ -162,6 +162,7 @@ def dentonm(indicator, benchmark, freq="aq", **kwargs):
 #        D4 - sum((X[t]/I[t] - X[t-1]/I[t-1])**2)
 #        D5 - sum((X[t]/I[t] / X[t-1]/I[t-1] - 1)**2)
 #NOTE: only D4 is the only one implemented, see IMF chapter 6.
+
 
     # check arrays and make 2d
     indicator = asarray(indicator)
@@ -218,8 +219,8 @@ def dentonm(indicator, benchmark, freq="aq", **kwargs):
     W = dot(dot(Zinv,HTH),Zinv)
 
     # make partitioned matrices
-    # TODO: break this out so that we can simplify the linalg?
-    I = zeros((n+m, n+m))  # noqa:E741
+    #TODO: break this out so that we can simplify the linalg?
+    I = zeros((n+m,n+m))
     I[:n,:n] = W
     I[:n,n:] = B
     I[n:,:n] = B.T
@@ -238,8 +239,8 @@ def dentonm(indicator, benchmark, freq="aq", **kwargs):
 
     return X.squeeze()
 
-
 if __name__ == "__main__":
+    import numpy as np
     #these will be the tests
     # from IMF paper
 

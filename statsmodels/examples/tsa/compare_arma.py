@@ -1,3 +1,4 @@
+from __future__ import print_function
 from time import time
 from statsmodels.tsa.arma_mle import Arma
 from statsmodels.tsa.api import ARMA
@@ -73,5 +74,5 @@ print(ret3)
 results += ["Arma.fit other", ret3[0]]
 print('time used:', t5-t4)
 
-for i in results:
-    print(i)
+for i in results: print(i)
+

@@ -1,20 +1,22 @@
-.. image:: images/statsmodels-logo-v2-horizontal.svg
-   :width: 50%
-   :alt: statsmodels
-   :align: left
+.. :tocdepth: 2
 
-:ref:`statsmodels <about:About statsmodels>` is a Python module that provides classes and functions for the estimation
+Welcome to Statsmodels's Documentation
+======================================
+
+:mod:`statsmodels` is a Python module that provides classes and functions for the estimation
 of many different statistical models, as well as for conducting statistical tests, and statistical
 data exploration. An extensive list of result statistics are available for each estimator.
 The results are tested against existing statistical packages to ensure that they are correct. The
 package is released under the open source Modified BSD (3-clause) license.
-The online documentation is hosted at `statsmodels.org <https://www.statsmodels.org/>`__.
+The online documentation is hosted at `statsmodels.org <http://www.statsmodels.org/>`__.
 
-Introduction
-============
 
-``statsmodels`` supports specifying models using R-style formulas and ``pandas`` DataFrames.
-Here is a simple example using ordinary least squares:
+Minimal Examples
+----------------
+
+Since version ``0.5.0`` of ``statsmodels``, you can use R-style formulas
+together with ``pandas`` data frames to fit your models. Here is a simple
+example using ordinary least squares:
 
 .. ipython:: python
 
@@ -52,44 +54,86 @@ You can also use ``numpy`` arrays instead of formulas:
     # Inspect the results
     print(results.summary())
 
-Have a look at `dir(results)` to see available results. Attributes are described in
-`results.__doc__` and results methods have their own docstrings.
+Have a look at `dir(results)` to see available results. Attributes are
+described in `results.__doc__` and results methods have their own docstrings.
 
 Citation
-========
+--------
 
-Please use following citation to cite statsmodels in scientific publications:
+When using statsmodels in scientific publication, please consider using the
+following citation:
 
-
-Seabold, Skipper, and Josef Perktold. "`statsmodels: Econometric and statistical modeling with
-python. <http://conference.scipy.org/proceedings/scipy2010/pdfs/seabold.pdf>`_" *Proceedings
-of the 9th Python in Science Conference.* 2010.
+ Seabold, Skipper, and Josef Perktold. "`Statsmodels: Econometric and statistical modeling with python. <http://conference.scipy.org/proceedings/scipy2010/pdfs/seabold.pdf>`_" *Proceedings of the 9th Python in Science Conference.* 2010.
 
 Bibtex entry::
 
   @inproceedings{seabold2010statsmodels,
-    title={statsmodels: Econometric and statistical modeling with python},
+    title={Statsmodels: Econometric and statistical modeling with python},
     author={Seabold, Skipper and Perktold, Josef},
     booktitle={9th Python in Science Conference},
     year={2010},
   }
 
+Basic Documentation
+-------------------
+
+.. toctree::
+    :maxdepth: 3
+
+    release/index
+    gettingstarted
+    example_formulas
+    install
+    about
+
+Information about the structure and development of
+statsmodels:
+
 .. toctree::
    :maxdepth: 1
 
-   install
-   gettingstarted
-   user-guide
-   examples/index
-   api
-   about
+   endog_exog
+   importpaths
+   pitfalls
    dev/index
-   release/index
+   dev/internal
+
+Table of Contents
+-----------------
+
+.. toctree::
+   :maxdepth: 3
+
+   regression
+   glm
+   gee
+   rlm
+   mixed_linear
+   discretemod
+   anova
+   tsa
+   statespace
+   duration
+   stats
+   nonparametric
+   gmm
+   contingency_tables
+   imputation
+   multivariate
+   emplike
+   miscmodels
+   distributions
+   graphics
+   iolib
+   tools
+   datasets/index
+   sandbox
 
 
-Index
-=====
+Indices and tables
+------------------
 
-:ref:`genindex`
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
 
-:ref:`modindex`

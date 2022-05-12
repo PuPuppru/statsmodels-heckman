@@ -1,19 +1,16 @@
-import itertools
 import os
-
 import numpy as np
 from statsmodels.duration.hazard_regression import PHReg
 from numpy.testing import (assert_allclose,
                            assert_equal, assert_)
 import pandas as pd
-import pytest
 
 # TODO: Include some corner cases: data sets with empty strata, strata
 #      with no events, entry times after censoring times, etc.
 
 # All the R results
-from .results import survival_r_results
-from .results import survival_enet_r_results
+from . import survival_r_results
+from . import survival_enet_r_results
 
 """
 Tests of PHReg against R coxph.
@@ -29,7 +26,6 @@ survival_r_results module.
 
 # Arguments passed to the PHReg fit method.
 args = {"method": "bfgs", "disp": 0}
-
 
 def get_results(n, p, ext, ties):
     if ext is None:
@@ -48,11 +44,10 @@ def get_results(n, p, ext, ties):
     hazard = getattr(survival_r_results, hazard_name)
     return coef, se, time, hazard
 
-class TestPHReg:
+class TestPHReg(object):
 
     # Load a data file from the results directory
-    @staticmethod
-    def load_file(fname):
+    def load_file(self, fname):
         cur_dir = os.path.dirname(os.path.abspath(__file__))
         data = np.genfromtxt(os.path.join(cur_dir, 'results', fname),
                              delimiter=" ")
@@ -63,12 +58,12 @@ class TestPHReg:
 
         return time, status, entry, exog
 
+
     # Run a single test against R output
-    @staticmethod
-    def do1(fname, ties, entry_f, strata_f):
+    def do1(self, fname, ties, entry_f, strata_f):
 
         # Read the test data.
-        time, status, entry, exog = TestPHReg.load_file(fname)
+        time, status, entry, exog = self.load_file(fname)
         n = len(time)
 
         vs = fname.split("_")
@@ -110,6 +105,23 @@ class TestPHReg:
 
         #smoke test
         time_h, cumhaz, surv = phrb.baseline_cumulative_hazard[0]
+
+
+    # Run all the tests
+    def test_r(self):
+
+        cur_dir = os.path.dirname(os.path.abspath(__file__))
+        rdir = os.path.join(cur_dir, 'results')
+        fnames = os.listdir(rdir)
+        fnames = [x for x in fnames if x.startswith("survival")
+                  and x.endswith(".csv")]
+
+        for fname in fnames:
+            for ties in "breslow","efron":
+                for entry_f in False,True:
+                    for strata_f in False,True:
+                        yield (self.do1, fname, ties, entry_f,
+                               strata_f)
 
     def test_missing(self):
 
@@ -189,20 +201,17 @@ class TestPHReg:
         result1 = model1.fit()
 
         from patsy import dmatrix
-        dfp = dmatrix(model1.data.design_info, df)
+        dfp = dmatrix(model1.data.design_info.builder, df)
 
         pr1 = result1.predict()
         pr2 = result1.predict(exog=df)
-        pr3 = model1.predict(result1.params, exog=dfp)  # No standard errors
-        pr4 = model1.predict(result1.params,
-                             cov_params=result1.cov_params(),
-                             exog=dfp)
+        pr3 = model1.predict(result1.params, exog=dfp) # No standard errors
+        pr4 = model1.predict(result1.params, cov_params=result1.cov_params(), exog=dfp)
 
         prl = (pr1, pr2, pr3, pr4)
         for i in range(4):
             for j in range(i):
-                assert_allclose(prl[i].predicted_values,
-                                prl[j].predicted_values)
+                assert_allclose(prl[i].predicted_values, prl[j].predicted_values)
 
         prl = (pr1, pr2, pr4)
         for i in range(3):
@@ -289,8 +298,8 @@ class TestPHReg:
         v = np.r_[0.85154336, 0.72993748, 0.73758071, 0.78599333]
         assert_allclose(np.abs(s_resid).mean(0), v)
 
-    @pytest.mark.smoke
     def test_summary(self):
+        # smoke test
         np.random.seed(34234)
         time = 50 * np.random.uniform(size=200)
         status = np.random.randint(0, 2, 200).astype(np.float64)
@@ -319,7 +328,6 @@ class TestPHReg:
         msg = "200 observations have positive entry times"
         assert_(msg in str(smry))
 
-    @pytest.mark.smoke
     def test_predict(self):
         # All smoke tests. We should be able to convert the lhr and hr
         # tests into real tests against R.  There are many options to
@@ -339,8 +347,8 @@ class TestPHReg:
             rslt.predict(endog=endog[0:10], exog=exog[0:10,:],
                          pred_type=pred_type)
 
-    @pytest.mark.smoke
     def test_get_distribution(self):
+        # Smoke test
         np.random.seed(34234)
         n = 200
         exog = np.random.normal(size=(n, 2))
@@ -362,6 +370,7 @@ class TestPHReg:
         fitted_sd = dist.std()
         sample = dist.rvs()
 
+
     def test_fit_regularized(self):
 
         # Data set sizes
@@ -382,9 +391,12 @@ class TestPHReg:
                 model = PHReg(time, exog, status=status, ties='breslow')
                 sm_result = model.fit_regularized(alpha=s)
 
-                # The agreement is not very high, the issue may be on
+                # The agreement isn't very high, the issue may be on
                 # the R side.  See below for further checks.
                 assert_allclose(sm_result.params, params, rtol=0.3)
+
+                # Smoke test for summary
+                smry = sm_result.summary()
 
                 # The penalized log-likelihood that we are maximizing.
                 def plf(params):
@@ -394,23 +406,15 @@ class TestPHReg:
                     return llf
 
                 # Confirm that we are doing better than glmnet.
+                from numpy.testing import assert_equal
                 llf_r = plf(params)
                 llf_sm = plf(sm_result.params)
                 assert_equal(np.sign(llf_sm - llf_r), 1)
 
 
-cur_dir = os.path.dirname(os.path.abspath(__file__))
-rdir = os.path.join(cur_dir, 'results')
-fnames = os.listdir(rdir)
-fnames = [x for x in fnames if x.startswith("survival")
-          and x.endswith(".csv")]
+if  __name__=="__main__":
 
-ties = ("breslow", "efron")
-entry_f = (False, True)
-strata_f = (False, True)
+    import nose
 
-
-@pytest.mark.parametrize('fname,ties,entry_f,strata_f',
-                         list(itertools.product(fnames, ties, entry_f, strata_f)))
-def test_r(fname, ties, entry_f, strata_f):
-    TestPHReg.do1(fname, ties, entry_f, strata_f)
+    nose.runmodule(argv=[__file__,'-vvs','-x','--pdb', '--pdb-failure'],
+                   exit=False)

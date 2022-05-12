@@ -38,14 +38,17 @@ Author: josef-pktd
 License: BSD
 
 '''
-from scipy import stats
+from __future__ import print_function
+from statsmodels.compat.python import iteritems
+from scipy import integrate # for scipy 0.6.0
+
+from scipy import stats, info
 from scipy.stats import distributions
 import numpy as np
 
-
 def get_u_argskwargs(**kwargs):
     #Todo: What's this? wrong spacing, used in Transf_gen TransfTwo_gen
-    u_kwargs = dict((k.replace('u_','',1),v) for k,v in kwargs.items()
+    u_kwargs = dict((k.replace('u_','',1),v) for k,v in iteritems(kwargs)
                     if k.startswith('u_'))
     u_args = u_kwargs.pop('u_args',None)
     return u_args, u_kwargs
@@ -75,8 +78,8 @@ class Transf_gen(distributions.rv_continuous):
 
 
         self.u_args, self.u_kwargs = get_u_argskwargs(**kwargs)
-        self.kls = kls  #(self.u_args, self.u_kwargs)
-                        # possible to freeze the underlying distribution
+        self.kls = kls   #(self.u_args, self.u_kwargs)
+                         # possible to freeze the underlying distribution
 
         super(Transf_gen,self).__init__(a=a, b=b, name = name,
                                         shapes=kls.shapes,
@@ -129,6 +132,9 @@ loggammaexpg = Transf_gen(stats.gamma, np.log, np.exp, numargs=1)
 random variable
 
 '''
+from scipy import stats
+from scipy.stats import distributions
+import numpy as np
 
 class ExpTransf_gen(distributions.rv_continuous):
     '''Distribution based on log/exp transformation
@@ -314,8 +320,8 @@ class TransfTwo_gen(distributions.rv_continuous):
 
 
         self.u_args, self.u_kwargs = get_u_argskwargs(**kwargs)
-        self.kls = kls  #(self.u_args, self.u_kwargs)
-                        # possible to freeze the underlying distribution
+        self.kls = kls   #(self.u_args, self.u_kwargs)
+                         # possible to freeze the underlying distribution
 
         super(TransfTwo_gen,self).__init__(a=a, b=b,
                                            name = name,
@@ -370,11 +376,11 @@ class TransfTwo_gen(distributions.rv_continuous):
 
 #TODO: rename these functions to have unique names
 
-class SquareFunc:
+class SquareFunc(object):
     '''class to hold quadratic function with inverse function and derivative
 
     using instance methods instead of class methods, if we want extension
-    to parametrized function
+    to parameterized function
     '''
     def inverseplus(self, x):
         return np.sqrt(x)

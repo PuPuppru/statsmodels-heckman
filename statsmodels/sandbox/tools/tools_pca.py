@@ -19,12 +19,12 @@ def pca(data, keepdim=0, normalize=0, demean=True):
     ----------
     data : ndarray, 2d
         data with observations by rows and variables in columns
-    keepdim : int
+    keepdim : integer
         number of eigenvectors to keep
         if keepdim is zero, then all eigenvectors are included
-    normalize : bool
+    normalize : boolean
         if true, then eigenvectors are normalized by sqrt of eigenvalues
-    demean : bool
+    demean : boolean
         if true, then the column mean is subtracted from the data
 
     Returns
@@ -47,7 +47,7 @@ def pca(data, keepdim=0, normalize=0, demean=True):
 
     '''
     x = np.array(data)
-    #make copy so original does not change, maybe not necessary anymore
+    #make copy so original doesn't change, maybe not necessary anymore
     if demean:
         m = x.mean(0)
     else:
@@ -91,10 +91,10 @@ def pcasvd(data, keepdim=0, demean=True):
     ----------
     data : ndarray, 2d
         data with observations by rows and variables in columns
-    keepdim : int
+    keepdim : integer
         number of eigenvectors to keep
         if keepdim is zero, then all eigenvectors are included
-    demean : bool
+    demean : boolean
         if true, then the column mean is subtracted from the data
 
     Returns
@@ -109,18 +109,18 @@ def pcasvd(data, keepdim=0, demean=True):
         eigenvectors, normalized if normalize is true
 
     See Also
-    --------
+    -------
     pca : principal component analysis using eigenvector decomposition
 
     Notes
     -----
-    This does not have yet the normalize option of pca.
+    This doesn't have yet the normalize option of pca.
 
     '''
     nobs, nvars = data.shape
     #print nobs, nvars, keepdim
     x = np.array(data)
-    #make copy so original does not change
+    #make copy so original doesn't change
     if demean:
         m = x.mean(0)
     else:

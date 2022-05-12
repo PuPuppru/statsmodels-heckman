@@ -5,20 +5,17 @@ Created on Wed Mar 28 15:34:18 2012
 
 Author: Josef Perktold
 """
-from statsmodels.compat.python import asbytes
-
-from io import BytesIO
 import warnings
+from statsmodels.compat.python import BytesIO, asbytes, range
+from statsmodels.compat.numpy import recarray_select
+
+from nose.tools import assert_true
 
 import numpy as np
-import pandas as pd
-import pytest
-from numpy.testing import assert_, assert_allclose, assert_almost_equal, assert_equal, \
-    assert_raises
+from numpy.testing import (assert_almost_equal, assert_equal, assert_,
+                           assert_raises, assert_allclose)
 
 from statsmodels.stats.libqsturng import qsturng
-from statsmodels.stats.multicomp import (tukeyhsd, pairwise_tukeyhsd,
-                                         MultiComparison)
 
 ss = '''\
   43.9  1   1
@@ -118,8 +115,7 @@ ss5 = '''\
 3 - 2\t-4.340\t-7.989\t-0.691\t***
 3 - 1\t0.260\t-3.389\t3.909\t-
 1 - 2\t-4.600\t-8.249\t-0.951\t***
-1 - 3\t-0.260\t-3.909\t3.389\t-
-'''
+1 - 3\t-0.260\t-3.909\t3.389\t'''
 
 cylinders = np.array([8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4, 6, 6, 6, 4, 4,
                     4, 4, 4, 4, 6, 8, 8, 8, 8, 4, 4, 4, 4, 8, 8, 8, 8, 6, 6, 6, 6, 4, 4, 4, 4, 6, 6,
@@ -140,19 +136,16 @@ ss2 = asbytes(ss2)
 ss3 = asbytes(ss3)
 ss5 = asbytes(ss5)
 
-dta = pd.read_csv(BytesIO(ss), sep=r'\s+', header=None, engine='python')
-dta.columns = "Rust", "Brand", "Replication"
-dta2 = pd.read_csv(BytesIO(ss2), sep=r'\s+', header=None, engine='python')
-dta2.columns = "idx", "Treatment", "StressReduction"
-dta2["Treatment"] = dta2["Treatment"].map(lambda v: v.encode('utf-8'))
-dta3 = pd.read_csv(BytesIO(ss3), sep=r'\s+', header=None, engine='python')
-dta3.columns = ["Brand", "Relief"]
-dta5 = pd.read_csv(BytesIO(ss5), sep=r'\t', header=None, engine='python')
-dta5.columns = ['pair', 'mean', 'lower', 'upper', 'sig']
-for col in ('pair', 'sig'):
-    dta5[col] = dta5[col].map(lambda v: v.encode('utf-8'))
-sas_ = dta5.iloc[[1, 3, 2]]
+dta = np.recfromtxt(BytesIO(ss), names=("Rust","Brand","Replication"))
+dta2 = np.recfromtxt(BytesIO(ss2), names = ("idx", "Treatment", "StressReduction"))
+dta3 = np.recfromtxt(BytesIO(ss3), names = ("Brand", "Relief"))
+dta5 = np.recfromtxt(BytesIO(ss5), names = ('pair', 'mean', 'lower', 'upper', 'sig'), delimiter='\t')
+sas_ = dta5[[1,3,2]]
 
+from statsmodels.stats.multicomp import (tukeyhsd, pairwise_tukeyhsd,
+                                         MultiComparison)
+#import statsmodels.sandbox.stats.multicomp as multi
+#print tukeyhsd(dta['Brand'], dta['Rust'])
 
 def get_thsd(mci, alpha=0.05):
     var_ = np.var(mci.groupstats.groupdemean(), ddof=len(mci.groupsunique))
@@ -168,12 +161,12 @@ def get_thsd(mci, alpha=0.05):
     assert_almost_equal(var_, var2, decimal=14)
     return resi
 
-class CheckTuckeyHSDMixin:
+class CheckTuckeyHSDMixin(object):
 
     @classmethod
-    def setup_class_(cls):
-        cls.mc = MultiComparison(cls.endog, cls.groups)
-        cls.res = cls.mc.tukeyhsd(alpha=cls.alpha)
+    def setup_class_(self):
+        self.mc = MultiComparison(self.endog, self.groups)
+        self.res = self.mc.tukeyhsd(alpha=self.alpha)
 
     def test_multicomptukey(self):
         assert_almost_equal(self.res.meandiffs, self.meandiff2, decimal=14)
@@ -189,33 +182,26 @@ class CheckTuckeyHSDMixin:
         res = pairwise_tukeyhsd(self.endog, self.groups, alpha=self.alpha)
         assert_almost_equal(res.confint, self.res.confint, decimal=14)
 
-    @pytest.mark.smoke
-    @pytest.mark.matplotlib
-    def test_plot_simultaneous_ci(self, close_figures):
-        self.res._simultaneous_ci()
-        reference = self.res.groupsunique[1]
-        self.res.plot_simultaneous(comparison_name=reference)
-
 
 class TestTuckeyHSD2(CheckTuckeyHSDMixin):
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(self):
         #balanced case
-        cls.endog = dta2['StressReduction']
-        cls.groups = dta2['Treatment']
-        cls.alpha = 0.05
-        cls.setup_class_() #in super
+        self.endog = dta2['StressReduction']
+        self.groups = dta2['Treatment']
+        self.alpha = 0.05
+        self.setup_class_() #in super
 
         #from R
         tukeyhsd2s = np.array([ 1.5,1,-0.5,0.3214915,
                                -0.1785085,-1.678509,2.678509,2.178509,
                                 0.6785085,0.01056279,0.1079035,0.5513904]
-                              ).reshape(3,4, order='F')
-        cls.meandiff2 = tukeyhsd2s[:, 0]
-        cls.confint2 = tukeyhsd2s[:, 1:3]
+                                ).reshape(3,4, order='F')
+        self.meandiff2 = tukeyhsd2s[:, 0]
+        self.confint2 = tukeyhsd2s[:, 1:3]
         pvals = tukeyhsd2s[:, 3]
-        cls.reject2 = pvals < 0.05
+        self.reject2 = pvals < 0.05
 
     def test_table_names_default_group_order(self):
         t = self.res._results_table
@@ -249,31 +235,29 @@ class TestTuckeyHSD2(CheckTuckeyHSDMixin):
 class TestTuckeyHSD2Pandas(TestTuckeyHSD2):
 
     @classmethod
-    def setup_class(cls):
-        super(TestTuckeyHSD2Pandas, cls).setup_class()
+    def setup_class(self):
+        super(TestTuckeyHSD2Pandas, self).setup_class()
 
-        cls.endog = pd.Series(cls.endog)
+        import pandas
+        self.endog = pandas.Series(self.endog)
         # we are working with bytes on python 3, not with strings in this case
-        cls.groups = pd.Series(cls.groups, dtype=object)
+        self.groups = pandas.Series(self.groups, dtype=object)
 
     def test_incorrect_output(self):
         # too few groups
-        with pytest.raises(ValueError):
-            MultiComparison(np.array([1] * 10), [1, 2] * 4)
+        assert_raises(ValueError, MultiComparison, np.array([1] * 10), [1, 2] * 4)
         # too many groups
-        with pytest.raises(ValueError):
-            MultiComparison(np.array([1] * 10), [1, 2] * 6)
+        assert_raises(ValueError, MultiComparison, np.array([1] * 10), [1, 2] * 6)
         # just one group
-        with pytest.raises(ValueError):
-            MultiComparison(np.array([1] * 10), [1] * 10)
+        assert_raises(ValueError, MultiComparison, np.array([1] * 10), [1] * 10)
 
-        # group_order does not select all observations, only one group left
+        # group_order doesn't select all observations, only one group left
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter('always')
             assert_raises(ValueError, MultiComparison, np.array([1] * 10),
                          [1, 2] * 5, group_order=[1])
 
-        # group_order does not select all observations,
+        # group_order doesn't select all observations,
         # we do tukey_hsd with reduced set of observations
         data = np.arange(15)
         groups = np.repeat([1, 2, 3], 5)
@@ -281,7 +265,7 @@ class TestTuckeyHSD2Pandas(TestTuckeyHSD2):
             warnings.simplefilter('always')
             mod1 = MultiComparison(np.array(data), groups, group_order=[1, 2])
             assert_equal(len(w), 1)
-            assert issubclass(w[0].category, UserWarning)
+            assert_true(issubclass(w[0].category, UserWarning))
 
         res1 = mod1.tukeyhsd(alpha=0.01)
         mod2 = MultiComparison(np.array(data[:10]), groups[:10])
@@ -305,12 +289,12 @@ class TestTuckeyHSD2Pandas(TestTuckeyHSD2):
 
 class TestTuckeyHSD2s(CheckTuckeyHSDMixin):
     @classmethod
-    def setup_class(cls):
+    def setup_class(self):
         #unbalanced case
-        cls.endog = dta2['StressReduction'][3:29]
-        cls.groups = dta2['Treatment'][3:29]
-        cls.alpha = 0.01
-        cls.setup_class_()
+        self.endog = dta2['StressReduction'][3:29]
+        self.groups = dta2['Treatment'][3:29]
+        self.alpha = 0.01
+        self.setup_class_()
 
         #from R
         tukeyhsd2s = np.array(
@@ -318,51 +302,53 @@ class TestTuckeyHSD2s(CheckTuckeyHSDMixin):
                  -0.5908785, -2.587133, 3.511923, 2.368656,
                  0.5871331, 0.002837638, 0.150456, 0.1266072]
                 ).reshape(3,4, order='F')
-        cls.meandiff2 = tukeyhsd2s[:, 0]
-        cls.confint2 = tukeyhsd2s[:, 1:3]
+        self.meandiff2 = tukeyhsd2s[:, 0]
+        self.confint2 = tukeyhsd2s[:, 1:3]
         pvals = tukeyhsd2s[:, 3]
-        cls.reject2 = pvals < 0.01
+        self.reject2 = pvals < 0.01
 
 
 class TestTuckeyHSD3(CheckTuckeyHSDMixin):
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(self):
         #SAS case
-        cls.endog = dta3['Relief']
-        cls.groups = dta3['Brand']
-        cls.alpha = 0.05
-        cls.setup_class_()
-        #super(cls, cls).setup_class_()
+        self.endog = dta3['Relief']
+        self.groups = dta3['Brand']
+        self.alpha = 0.05
+        self.setup_class_()
+        #super(self, self).setup_class_()
         #CheckTuckeyHSD.setup_class_()
-        cls.meandiff2 = sas_['mean']
-        cls.confint2 = sas_[['lower','upper']].astype(float).values.reshape((3, 2))
-        cls.reject2 = sas_['sig'] == asbytes('***')
+
+        self.meandiff2 = sas_['mean']
+        self.confint2 = recarray_select(sas_, ['lower','upper']).view(float).reshape((3,2))
+
+        self.reject2 = sas_['sig'] == asbytes('***')
 
 
 class TestTuckeyHSD4(CheckTuckeyHSDMixin):
 
     @classmethod
-    def setup_class(cls):
+    def setup_class(self):
         #unbalanced case verified in Matlab
-        cls.endog = cylinders
-        cls.groups = cyl_labels
-        cls.alpha = 0.05
-        cls.setup_class_()
-        cls.res._simultaneous_ci()
+        self.endog = cylinders
+        self.groups = cyl_labels
+        self.alpha = 0.05
+        self.setup_class_()
+        self.res._simultaneous_ci()
 
         #from Matlab
-        cls.halfwidth2 = np.array([1.5228335685980883, 0.9794949704444682, 0.78673802805533644,
+        self.halfwidth2 = np.array([1.5228335685980883, 0.9794949704444682, 0.78673802805533644,
                                     2.3321237694566364, 0.57355135882752939])
-        cls.meandiff2 = np.array([0.22222222222222232, 0.13333333333333375, 0.0, 2.2898550724637685,
+        self.meandiff2 = np.array([0.22222222222222232, 0.13333333333333375, 0.0, 2.2898550724637685,
                             -0.088888888888888573, -0.22222222222222232, 2.0676328502415462,
                             -0.13333333333333375, 2.1565217391304348, 2.2898550724637685])
-        cls.confint2 = np.array([-2.32022210717, 2.76466655161, -2.247517583, 2.51418424967,
+        self.confint2 = np.array([-2.32022210717, 2.76466655161, -2.247517583, 2.51418424967,
                             -3.66405224956, 3.66405224956, 0.113960166573, 4.46574997835,
                             -1.87278583908, 1.6950080613, -3.529655688, 3.08521124356, 0.568180988881,
                             3.5670847116, -3.31822643175, 3.05155976508, 0.951206924521, 3.36183655374,
                              -0.74487911754, 5.32458926247]).reshape(10,2)
-        cls.reject2 = np.array([False, False, False,  True, False, False,  True, False,  True, False])
+        self.reject2 = np.array([False, False, False,  True, False, False,  True, False,  True, False])
 
     def test_hochberg_intervals(self):
-        assert_almost_equal(self.res.halfwidths, self.halfwidth2, 4)
+        assert_almost_equal(self.res.halfwidths, self.halfwidth2, 14)

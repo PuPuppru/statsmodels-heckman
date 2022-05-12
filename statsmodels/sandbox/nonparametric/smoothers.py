@@ -7,12 +7,20 @@ who generate a smooth fit of a set of (x,y) pairs.
 # pylint: disable-msg=W0142
 # pylint: disable-msg=E0611
 # pylint: disable-msg=E1101
+from __future__ import print_function
+from statsmodels.compat.python import long
 
 import numpy as np
 from . import kernels
+#import numbers
+#from scipy.linalg import solveh_banded
+#from scipy.optimize import golden
 
+#from models import _hbspline        # Need to alter setup to be able to import
+                                    # extension from models or drop for scipy
+#from models.bspline import BSpline, _band2array
 
-class KernelSmoother:
+class KernelSmoother(object):
     """
     1D Kernel Density Regression/Kernel Smoother
 
@@ -55,7 +63,7 @@ class KernelSmoother:
         confidence.
         These bounds are based on variance only, and do not include the bias.
         If the bandwidth is much larger than the curvature of the underlying
-        function then the bias could be large.
+        funtion then the bias could be large.
 
         x is the points on which you want to evaluate the fit and the errors.
 
@@ -64,7 +72,7 @@ class KernelSmoother:
         xth sample point - so they are closer together where the data
         is denser.
         """
-        if isinstance(x, int):
+        if isinstance(x, (int, long)):
             sorted_x = np.array(self.x)
             sorted_x.sort()
             confx = sorted_x[::x]
@@ -81,7 +89,7 @@ class KernelSmoother:
     def std(self, x):
         return np.sqrt(self.var(x))
 
-class PolySmoother:
+class PolySmoother(object):
     """
     Polynomial smoother up to a given order.
     Fit based on weighted least squares.
@@ -90,10 +98,11 @@ class PolySmoother:
 
     This is a 3 liner with OLS or WLS, see test.
     It's here as a test smoother for GAM
+
     """
     #JP: heavily adjusted to work as plugin replacement for bspline
-    #   smoother in gam.py  initialized by function default_smoother
-    #   Only fixed exceptions, I did not check whether it is statistically
+    #   smoother in gam.py  initalized by function default_smoother
+    #   Only fixed exceptions, I didn't check whether it is statistically
     #   correctand I think it is not, there are still be some dimension
     #   problems, and there were some dimension problems initially.
     # TODO: undo adjustments and fix dimensions correctly
@@ -154,8 +163,7 @@ class PolySmoother:
                 print('Warning: 2d x detected in PolySmoother predict, shape:', x.shape)
                 x=x[:,0]  #TODO: check and clean this up
             X = np.array([(x**i) for i in range(self.order+1)])
-        else:
-            X = self.X
+        else: X = self.X
         #return np.squeeze(np.dot(X.T, self.coef))
         #need to check what dimension this is supposed to be
         if X.shape[1] == self.coef.shape[0]:
@@ -176,7 +184,7 @@ class PolySmoother:
             if not hasattr(self, "X"):
                 raise ValueError("x needed to fit PolySmoother")
         else:
-            if x.ndim > 1:
+            if x.ndim > 1: 
                 print('Warning: 2d x detected in PolySmoother predict, shape:', x.shape)
                 #x=x[0,:] #TODO: check orientation, row or col
             self.X = np.array([(x**i) for i in range(self.order+1)]).T
@@ -187,7 +195,7 @@ class PolySmoother:
         _y = y * _w#[:,None]
         #self.coef = np.dot(L.pinv(X).T, _y[:,None])
         #self.coef = np.dot(L.pinv(X), _y)
-        self.coef = np.linalg.lstsq(X, _y, rcond=-1)[0]
+        self.coef = np.linalg.lstsq(X, _y)[0]
         self.params = np.squeeze(self.coef)
 
 
@@ -221,7 +229,7 @@ class PolySmoother:
 ##        if x is None:
 ##            x = self.tau[(self.M-1):-(self.M-1)] # internal knots
 ##
-##        if pen == 0.: # cannot use cholesky for singular matrices
+##        if pen == 0.: # can't use cholesky for singular matrices
 ##            banded = False
 ##
 ##        if x.shape != y.shape:

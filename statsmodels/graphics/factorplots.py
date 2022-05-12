@@ -2,8 +2,7 @@
 """
 Authors:    Josef Perktold, Skipper Seabold, Denis A. Engemann
 """
-from statsmodels.compat.python import lrange
-
+from statsmodels.compat.python import get_function_name, iterkeys, lrange, zip, iteritems
 import numpy as np
 
 from statsmodels.graphics.plottools import rainbow
@@ -18,29 +17,30 @@ def interaction_plot(x, trace, response, func=np.mean, ax=None, plottype='b',
     Interaction plot for factor level statistics.
 
     Note. If categorial factors are supplied levels will be internally
-    recoded to integers. This ensures matplotlib compatibility. Uses
-    a DataFrame to calculate an `aggregate` statistic for each level of the
-    factor or group given by `trace`.
+    recoded to integers. This ensures matplotlib compatiblity.
+
+    uses pandas.DataFrame to calculate an `aggregate` statistic for each
+    level of the factor or group given by `trace`.
 
     Parameters
     ----------
-    x : array_like
+    x : array-like
         The `x` factor levels constitute the x-axis. If a `pandas.Series` is
         given its name will be used in `xlabel` if `xlabel` is None.
-    trace : array_like
+    trace : array-like
         The `trace` factor levels will be drawn as lines in the plot.
         If `trace` is a `pandas.Series` its name will be used as the
         `legendtitle` if `legendtitle` is None.
-    response : array_like
+    response : array-like
         The reponse or dependent variable. If a `pandas.Series` is given
         its name will be used in `ylabel` if `ylabel` is None.
     func : function
         Anything accepted by `pandas.DataFrame.aggregate`. This is applied to
         the response variable grouped by the trace levels.
-    ax : axes, optional
-        Matplotlib axes instance
     plottype : str {'line', 'scatter', 'both'}, optional
         The type of plot to return. Can be 'l', 's', or 'b'
+    ax : axes, optional
+        Matplotlib axes instance
     xlabel : str, optional
         Label to use for `x`. Default is 'X'. If `x` is a `pandas.Series` it
         will use the series names.
@@ -49,21 +49,17 @@ def interaction_plot(x, trace, response, func=np.mean, ax=None, plottype='b',
         `response` is a `pandas.Series` it will use the series names.
     colors : list, optional
         If given, must have length == number of levels in trace.
-    markers : list, optional
-        If given, must have length == number of levels in trace
     linestyles : list, optional
         If given, must have length == number of levels in trace.
-    legendloc : {None, str, int}
-        Location passed to the legend command.
-    legendtitle : {None, str}
-        Title of the legend.
-    **kwargs
+    markers : list, optional
+        If given, must have length == number of lovels in trace
+    kwargs
         These will be passed to the plot command used either plot or scatter.
         If you want to control the overall plotting options, use kwargs.
 
     Returns
     -------
-    Figure
+    fig : Figure
         The figure given by `ax.figure` or a new instance.
 
     Examples
@@ -96,7 +92,7 @@ def interaction_plot(x, trace, response, func=np.mean, ax=None, plottype='b',
     fig, ax = utils.create_mpl_ax(ax)
 
     response_name = ylabel or getattr(response, 'name', 'response')
-    ylabel = '%s of %s' % (func.__name__, response_name)
+    ylabel = '%s of %s' % (get_function_name(func), response_name)
     xlabel = xlabel or getattr(x, 'name', 'X')
     legendtitle = legendtitle or getattr(trace, 'name', 'Trace')
 
@@ -117,7 +113,7 @@ def interaction_plot(x, trace, response, func=np.mean, ax=None, plottype='b',
     n_trace = len(plot_data['trace'].unique())
 
     linestyles = ['-'] * n_trace if linestyles is None else linestyles
-    markers = ['.'] * n_trace if markers is None else markers
+    markers = ['.'] * n_trace  if markers is None else markers
     colors = rainbow(n_trace) if colors is None else colors
 
     if len(linestyles) != n_trace:
@@ -163,7 +159,7 @@ def _recode(x, levels):
 
     Parameters
     ----------
-    x : array_like
+    x : array-like
         array like object supporting with numpy array methods of categorially
         coded data.
     levels : dict
@@ -172,14 +168,13 @@ def _recode(x, levels):
     Returns
     -------
     out : instance numpy.ndarray
+
     """
     from pandas import Series
     name = None
-    index = None
 
     if isinstance(x, Series):
         name = x.name
-        index = x.index
         x = x.values
 
     if x.dtype.type not in [np.str_, np.object_]:
@@ -190,15 +185,16 @@ def _recode(x, levels):
         raise ValueError('This is not a valid value for levels.'
                          ' Dict required.')
 
-    elif not (np.unique(x) == np.unique(list(levels.keys()))).all():
+    elif not (np.unique(x) == np.unique(list(iterkeys(levels)))).all():
         raise ValueError('The levels do not match the array values.')
 
     else:
-        out = np.empty(x.shape[0], dtype=int)
-        for level, coding in levels.items():
+        out = np.empty(x.shape[0], dtype=np.int)
+        for level, coding in iteritems(levels):
             out[x == level] = coding
 
         if name:
-            out = Series(out, name=name, index=index)
+            out = Series(out)
+            out.name = name
 
         return out

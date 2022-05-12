@@ -12,7 +12,7 @@ from . import stattools as stt
 
 
 #todo: check subclassing for descriptive stats classes
-class TsaDescriptive:
+class TsaDescriptive(object):
     '''collection of descriptive statistical methods for time series
 
     '''
@@ -46,7 +46,7 @@ class TsaDescriptive:
         return stt.pacf(self.data, nlags=nlags)
 
     def periodogram(self):
-        #does not return frequesncies
+        #doesn't return frequesncies
         return stt.periodogram(self.data)
 
     # copied from fftarma.py
@@ -78,3 +78,5 @@ class TsaDescriptive:
         ax.set_title('Partial Autocorrelation' + namestr)
 
         return fig
+
+

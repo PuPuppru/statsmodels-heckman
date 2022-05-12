@@ -9,7 +9,7 @@ Created on Sat May 28 15:38:23 2011
 
 TODO:
 * renaming,
-    - after adding t distribution, cov does not make sense for Sigma    DONE
+    - after adding t distribution, cov doesn't make sense for Sigma    DONE
     - should mean also be renamed to mu, if there will be distributions
       with mean != mu
 * not sure about corner cases
@@ -144,12 +144,11 @@ What's currently there?
 'standardize', 'standardized', 'std', 'std_sigma', 'whiten']
 
 """
+from __future__ import print_function
 import numpy as np
-from scipy import special
 
-from statsmodels.sandbox.distributions.multivariate import mvstdtprob
-from .extras import mvnormcdf
-
+from statsmodels.sandbox.distributions.multivariate import (
+                mvstdtprob, mvstdnormcdf, mvnormcdf)
 
 def expect_mc(dist, func=lambda x: 1, size=50000):
     '''calculate expected value of function by Monte Carlo integration
@@ -167,7 +166,7 @@ def expect_mc(dist, func=lambda x: 1, size=50000):
 
     Notes
     -----
-    this does not batch
+    this doesn't batch
 
     Returns
     -------
@@ -231,7 +230,7 @@ def expect_mc_bounds(dist, func=lambda x: 1, size=50000, lower=None, upper=None,
 
     Notes
     -----
-    this does not batch
+    this doesn't batch
 
     Returns
     -------
@@ -290,8 +289,7 @@ def expect_mc_bounds(dist, func=lambda x: 1, size=50000, lower=None, upper=None,
 
         rvsli.append(rvsok)   #[:remain]) use extras instead
         print(used)
-        if used >= size:
-            break
+        if used >= size: break
     rvs = np.vstack(rvsli)
     print(rvs.shape)
     assert used == rvs.shape[0] #saftey check
@@ -324,7 +322,7 @@ def bivariate_normal(x, mu, cov):
 
 
 
-class BivariateNormal:
+class BivariateNormal(object):
 
 
     #TODO: make integration limits more flexible
@@ -377,7 +375,7 @@ class BivariateNormal:
         rvs = self.rvs(size=size)
         return fun(rvs).mean()
 
-class MVElliptical:
+class MVElliptical(object):
     '''Base Class for multivariate elliptical distributions, normal and t
 
     contains common initialization, and some common methods
@@ -420,7 +418,7 @@ class MVElliptical:
             self.sigmainv = np.eye(nvars) / sigma
             self.cholsigmainv = np.eye(nvars) / np.sqrt(sigma)
         elif (sigma.ndim == 1) and (len(sigma) == nvars):
-            #independent heteroskedastic
+            #independent heteroscedastic
             self.sigma = np.diag(sigma)
             self.sigmainv = np.diag(1. / sigma)
             self.cholsigmainv = np.diag( 1. / np.sqrt(sigma))
@@ -470,7 +468,7 @@ class MVElliptical:
 
         this should be made to work with 2d x,
         with multivariate normal vector in each row and iid across rows
-        does not work now because of dot in whiten
+        doesn't work now because of dot in whiten
 
         '''
 
@@ -508,8 +506,8 @@ class MVElliptical:
         whiten the data by linear transformation
 
         Parameters
-        ----------
-        x : array_like, 1d or 2d
+        -----------
+        x : array-like, 1d or 2d
             Data to be whitened, if 2d then each row contains an independent
             sample of the multivariate random vector
 
@@ -519,12 +517,13 @@ class MVElliptical:
 
         Notes
         -----
-        This only does rescaling, it does not subtract the mean, use standardize
+        This only does rescaling, it doesn't subtract the mean, use standardize
         for this instead
 
         See Also
         --------
         standardize : subtract mean and rescale to standardized random variable.
+
         """
         x = np.asarray(x)
         return np.dot(x, self.cholsigmainv.T)
@@ -550,8 +549,8 @@ class MVElliptical:
         '''standardize the random variable, i.e. subtract mean and whiten
 
         Parameters
-        ----------
-        x : array_like, 1d or 2d
+        -----------
+        x : array-like, 1d or 2d
             Data to be whitened, if 2d then each row contains an independent
             sample of the multivariate random vector
 
@@ -583,8 +582,8 @@ class MVElliptical:
         The distribution will have zero mean and sigma equal to correlation
 
         Parameters
-        ----------
-        x : array_like, 1d or 2d
+        -----------
+        x : array-like, 1d or 2d
             Data to be whitened, if 2d then each row contains an independent
             sample of the multivariate random vector
 
@@ -682,7 +681,7 @@ class MVElliptical:
 
 
 #parts taken from linear_model, but heavy adjustments
-class MVNormal0:
+class MVNormal0(object):
     '''Class for Multivariate Normal Distribution
 
     original full version, kept for testing, new version inherits from
@@ -708,7 +707,7 @@ class MVNormal0:
             self.covinv = np.eye(nvars) / cov
             self.cholcovinv = np.eye(nvars) / np.sqrt(cov)
         elif (cov.ndim == 1) and (len(cov) == nvars):
-            #independent heteroskedastic
+            #independent heteroscedastic
             self.cov = np.diag(cov)
             self.covinv = np.diag(1. / cov)
             self.cholcovinv = np.diag( 1. / np.sqrt(cov))
@@ -727,8 +726,8 @@ class MVNormal0:
         whiten the data by linear transformation
 
         Parameters
-        ----------
-        X : array_like, 1d or 2d
+        -----------
+        X : array-like, 1d or 2d
             Data to be whitened, if 2d then each row contains an independent
             sample of the multivariate random vector
 
@@ -738,12 +737,13 @@ class MVNormal0:
 
         Notes
         -----
-        This only does rescaling, it does not subtract the mean, use standardize
+        This only does rescaling, it doesn't subtract the mean, use standardize
         for this instead
 
         See Also
         --------
         standardize : subtract mean and rescale to standardized random variable.
+
         """
         x = np.asarray(x)
         if np.any(self.cov):
@@ -809,7 +809,7 @@ class MVNormal0:
 
         this should be made to work with 2d x,
         with multivariate normal vector in each row and iid across rows
-        does not work now because of dot in whiten
+        doesn't work now because of dot in whiten
 
         '''
         x = np.asarray(x)
@@ -873,7 +873,7 @@ class MVNormal(MVElliptical):
 
         this should be made to work with 2d x,
         with multivariate normal vector in each row and iid across rows
-        does not work now because of dot in whiten
+        doesn't work now because of dot in whiten
 
         '''
         x = np.asarray(x)
@@ -925,9 +925,10 @@ class MVNormal(MVElliptical):
 
         Returns
         -------
-        mvt : instance of MVNormal
-            instance of multivariate normal distribution given by affine
+        mvt : instance of MVT
+            instance of multivariate t distribution given by affine
             transformation
+
 
         Notes
         -----
@@ -951,7 +952,7 @@ class MVNormal(MVElliptical):
         return MVNormal(mean_new, sigma_new)
 
     def conditional(self, indices, values):
-        r'''return conditional distribution
+        '''return conditional distribution
 
         indices are the variables to keep, the complement is the conditioning
         set
@@ -981,7 +982,7 @@ class MVNormal(MVElliptical):
         '''
         #indices need to be nd arrays for broadcasting
         keep = np.asarray(indices)
-        given = np.asarray([i for i in range(self.nvars) if i not in keep])
+        given = np.asarray([i for i in range(self.nvars) if not i in keep])
         sigmakk = self.sigma[keep[:, None], keep]
         sigmagg = self.sigma[given[:, None], given]
         sigmakg = self.sigma[keep[:, None], given]
@@ -999,6 +1000,8 @@ class MVNormal(MVElliptical):
         return MVNormal(mean_new, sigma_new)
 
 
+
+from scipy import special
 #redefine some shortcuts
 np_log = np.log
 np_pi = np.pi
@@ -1109,7 +1112,7 @@ class MVT(MVElliptical):
         #std_sigma = np.sqrt(np.diag(self.sigma))
         upper = (x - self.mean)/self.std_sigma
         return mvstdtprob(lower, upper, self.corr, self.df, **kwds)
-        #mvstdtcdf does not exist yet
+        #mvstdtcdf doesn't exist yet
         #return mvstdtcdf(lower, x, self.corr, df, **kwds)
 
     @property
@@ -1272,3 +1275,4 @@ if __name__ == '__main__':
     assert_almost_equal(mvt.pdf(cov3),
         [0.000863777424247410, 0.001277510788307594, 0.004156314279452241],
         decimal=17)
+

@@ -7,10 +7,11 @@ Created on Sat Apr 16 16:06:11 2011
 Author: Josef Perktold
 License : BSD
 """
+from __future__ import print_function
 import numpy as np
 
 
-class TransformFunction:
+class TransformFunction(object):
 
     def __call__(self, x):
         self.func(x)
@@ -24,7 +25,7 @@ class SquareFunc(TransformFunction):
     '''class to hold quadratic function with inverse function and derivative
 
     using instance methods instead of class methods, if we want extension
-    to parametrized function
+    to parameterized function
     '''
 
     def func(self, x):
@@ -186,3 +187,5 @@ if __name__ == '__main__':
     print(chainf.func(3.))
     chainf2 = ChainFunc(BoxCoxNonzeroFunc(2), AffineFunc(1,2))
     print(chainf.func(3.))
+
+

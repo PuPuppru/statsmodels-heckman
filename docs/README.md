@@ -12,7 +12,7 @@ of these with
 
 ```bash
 
-   python -m pip install -e .[docs]
+   pip install -e .[docs]
 
 ```
 

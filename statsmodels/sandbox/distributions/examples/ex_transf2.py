@@ -4,6 +4,7 @@ Created on Sun May 09 22:23:22 2010
 Author: josef-pktd
 Licese: BSD
 """
+from __future__ import print_function
 import numpy as np
 
 from numpy.testing import assert_almost_equal
@@ -42,7 +43,7 @@ def test_loglaplace():
     cdftr = loglaplaceexpg._cdf(3,0,1./3)
     assert_almost_equal(cdfst, cdftr, 14)
 
-class CheckDistEquivalence:
+class CheckDistEquivalence(object):
 
     #no args, kwds yet
 
@@ -235,8 +236,7 @@ if __name__ == '__main__':
     #Note the results differ for skew and kurtosis. I think the 3rd and 4th moment
     #    in the scipy.stats.f distribution is incorrect.
     # I corrected it now in stats.distributions.py in bzr branch
-    v1=1
-    v2=10
+    v1=1; v2=10;
     g1 = 2*(v2+2*v1-2.)/(v2-6.)*np.sqrt(2*(v2-4.)/(v1*(v2+v1-2.)))
     g2 = 3/(2.*v2-16)*(8+g1*g1*(v2-6.))
     print('corrected skew, kurtosis of f(1,10) is', g1, g2)
@@ -311,5 +311,6 @@ if __name__ == '__main__':
     Traceback (most recent call last):
     '''
 
-    import pytest
-    pytest.main([__file__, '-vvs', '-x', '--pdb'])
+    import nose
+    nose.runmodule(argv=['__main__','-vvs','-x'],#,'--pdb', '--pdb-failure'],
+                   exit=False)

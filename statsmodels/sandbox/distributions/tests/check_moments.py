@@ -1,15 +1,16 @@
 '''script to test expect and moments in distributions.stats method
 
-not written as a test, prints results, renamed to prevent test runner from running it
+not written as a test, prints results, renamed to prevent nose from running it
 
 
 '''
+from statsmodels.compat.python import iteritems
 import numpy as np
 from scipy import stats
 #from statsmodels.stats.moment_helpers import mnc2mvsk
 from statsmodels.sandbox.distributions.sppatch import expect_v2
 
-from .distparams import distcont
+from .distparams import distcont, distdiscrete#, distslow
 
 
 specialcases = {'ncf':{'ub':1000} # diverges if it's too large, checked for mean
@@ -135,15 +136,15 @@ def nct_kurt_bug():
 if __name__ == '__main__':
 
     check_cont_basic()
-    #print [(k, v[0]) for k,v in res.items() if np.abs(v[0]-1)>1e-3]
-    #print [(k, v[2][0], 1+2*v[2][0]) for k,v in res.items() if np.abs(v[-1]-(1+2*v[2][0]))>1e-3]
-    mean_ = [(k, v[1][0], v[2][0]) for k,v in res.items()
+    #print [(k, v[0]) for k,v in iteritems(res) if np.abs(v[0]-1)>1e-3]
+    #print [(k, v[2][0], 1+2*v[2][0]) for k,v in iteritems(res) if np.abs(v[-1]-(1+2*v[2][0]))>1e-3]
+    mean_ = [(k, v[1][0], v[2][0]) for k,v in iteritems(res)
              if np.abs(v[1][0] - v[2][0])>1e-6 and np.isfinite(v[1][0])]
-    var_ = [(k, v[1][1], v[2][1]) for k,v in res.items()
+    var_ = [(k, v[1][1], v[2][1]) for k,v in iteritems(res)
             if np.abs(v[1][1] - v[2][1])>1e-2 and np.isfinite(v[1][1])]
-    skew = [(k, v[1][2], v[2][2]) for k,v in res.items()
+    skew = [(k, v[1][2], v[2][2]) for k,v in iteritems(res)
             if np.abs(v[1][2] - v[2][2])>1e-2 and np.isfinite(v[1][1])]
-    kurt = [(k, v[1][3], v[2][3]) for k,v in res.items()
+    kurt = [(k, v[1][3], v[2][3]) for k,v in iteritems(res)
             if np.abs(v[1][3] - v[2][3])>1e-2 and np.isfinite(v[1][1])]
 
     from statsmodels.iolib import SimpleTable

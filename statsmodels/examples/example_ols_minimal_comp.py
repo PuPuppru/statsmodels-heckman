@@ -4,6 +4,7 @@ add example for new compare methods
 
 """
 
+from __future__ import print_function
 import numpy as np
 import statsmodels.api as sm
 
@@ -28,3 +29,8 @@ print(results.compare_lr_test(results2))
 <F test: F=array([[ 1.84190375]]), p=[[ 0.17787756]], df_denom=97, df_num=1>
 (1.8810663357027693, 0.17021300121753191, 1.0)
 '''
+
+
+
+
+
